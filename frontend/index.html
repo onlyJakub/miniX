@@ -3,16 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" />
-    <title>MiniX — test połączenia</title>
+    <title>MiniX</title>
     <script type="module" src="/src/main.js"></script>
   </head>
   <body>
     <main>
-      <section aria-labelledby="health-heading">
+      <header>
+        <h1>Mini<span class="text-sky-400">X</span></h1>
+        <p class="hint">Twoje konto w MiniX.</p>
+      </header>
+      <section class="panel" aria-labelledby="account-heading">
+        <h2 id="account-heading">Konto użytkownika</h2>
+        <p id="session-message" class="message" role="status" aria-live="polite">Sprawdzanie sesji…</p>
+        <nav id="guest-panel" aria-label="Konto" hidden>
+          <div class="mt-5 flex flex-wrap gap-5">
+            <a href="/login.html">Zaloguj się</a>
+            <a href="/register.html">Zarejestruj się</a>
+          </div>
+        </nav>
+        <div id="user-panel" hidden>
+          <p class="mt-4 break-words">Zalogowano jako <strong id="current-username"></strong>.</p>
+          <p id="current-email" class="hint break-words"></p>
+          <button id="logout" type="button" class="mt-5">Wyloguj się</button>
+        </div>
+      </section>
+      <section class="panel" aria-labelledby="health-heading">
         <h2 id="health-heading">Test połączenia</h2>
-        <button id="check-health" type="button">Sprawdź połączenie</button>
-        <p id="health-status" role="status" aria-live="polite" aria-atomic="true">Test nie został jeszcze uruchomiony.</p>
+        <button id="check-health" type="button" class="mt-4">Sprawdź połączenie</button>
+        <p id="health-status" class="message" role="status" aria-live="polite" aria-atomic="true">Test nie został jeszcze uruchomiony.</p>
       </section>
     </main>
   </body>

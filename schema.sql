@@ -8,6 +8,9 @@ CREATE TABLE users (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX users_username_lower_unique ON users (lower(username));
+CREATE UNIQUE INDEX users_email_lower_unique ON users (lower(email));
+
 CREATE TABLE posts (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -1,11 +1,17 @@
-export async function checkHealth() {
+export async function apiRequest(path, { method = 'GET', body } = {}) {
   let response;
 
   try {
-    response = await fetch('/api/health', {
-      headers: { Accept: 'application/json' },
+    response = await fetch(`/api${path}`, {
+      method,
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/json',
+        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       cache: 'no-store',
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(15000),
     });
   } catch {
     throw new Error('Nie można połączyć się z API. Sprawdź, czy frontend i backend są uruchomione.');
@@ -20,8 +26,17 @@ export async function checkHealth() {
   }
 
   if (!response.ok) {
-    throw new Error(data.message || `Błąd API (HTTP ${response.status}).`);
+    const details = Array.isArray(data.errors)
+      ? [...new Set(data.errors.map((error) => error.message))].join(' ')
+      : '';
+    const error = new Error([data.message || `Błąd API (HTTP ${response.status}).`, details].filter(Boolean).join(' '));
+    error.status = response.status;
+    throw error;
   }
 
   return data;
+}
+
+export function checkHealth() {
+  return apiRequest('/health');
 }

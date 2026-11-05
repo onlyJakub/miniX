@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@layer base {
+  body { @apply min-h-screen bg-slate-950 text-slate-100 antialiased; }
+  main { @apply mx-auto max-w-2xl px-5 py-10 sm:py-16; }
+  h1 { @apply text-4xl font-bold tracking-tight; }
+  h2 { @apply text-xl font-semibold; }
+  a { @apply text-sky-300 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-300; }
+  label { @apply block text-sm font-medium; }
+  input { @apply mt-2 block w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2.5 text-base focus:border-sky-400 focus:outline-2 focus:outline-sky-400; }
+  button { @apply cursor-pointer rounded-lg bg-sky-400 px-4 py-2.5 font-semibold text-slate-950 hover:bg-sky-300 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-300 disabled:cursor-wait disabled:opacity-60; }
+}
+
+@layer components {
+  .panel { @apply mt-8 rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-8; }
+  .message { @apply mt-4 break-words text-sm leading-relaxed; }
+  .message[data-kind="error"] { @apply text-rose-300; }
+  .message[data-kind="success"] { @apply text-emerald-300; }
+  .hint { @apply mt-2 text-sm leading-relaxed text-slate-400; }
+}

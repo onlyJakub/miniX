@@ -1,16 +1,10 @@
 import os
-from pathlib import Path
-
 import psycopg
-from dotenv import load_dotenv
 from psycopg.rows import dict_row
-
-load_dotenv(Path(__file__).with_name(".env"))
-
+from . import config
 
 class DatabaseNotConfiguredError(Exception):
     """Brak adresu bazy danych w konfiguracji."""
-
 
 def get_connection():
     database_url = os.getenv("DATABASE_URL", "").strip()

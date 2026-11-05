@@ -1,15 +1,61 @@
 from typing import Literal
-
+from contextlib import asynccontextmanager
 import psycopg
-from fastapi import FastAPI, Response, status
+from fastapi import FastAPI, Request, Response, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from .database import DatabaseNotConfiguredError, get_connection
+from .auth import router as auth_router
+from .config import get_auth_settings
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    get_auth_settings()
+    yield
 
 app = FastAPI(
     title="MiniX API",
-    version="0.1.0",
+    version="0.2.0",
+    lifespan=lifespan,
 )
+app.include_router(auth_router)
+
+@app.middleware("http")
+async def no_cache_auth(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/auth/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error(request: Request, error: StarletteHTTPException):
+    return JSONResponse({"message": str(error.detail)}, status_code=error.status_code, headers=error.headers)
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, error: RequestValidationError):
+    fields = {"username": "Nazwa użytkownika", "email": "E-mail", "password": "Hasło", "identifier": "Login/e-mail"}
+    messages = {
+        "username": "Podaj 3–50 liter A–Z, cyfr lub znaków podkreślenia.",
+        "email": "Podaj poprawny adres e-mail (maksymalnie 255 znaków).",
+        "password": "Podaj prawidłowe hasło (rejestracja: 8–128 znaków).",
+        "identifier": "Podaj login lub e-mail (maksymalnie 255 znaków).",
+    }
+    errors = []
+    for item in error.errors():
+        field = str(item["loc"][-1])
+        errors.append({"field": field if field in fields else "form", "message": messages.get(field, "Nieprawidłowe dane formularza.")})
+    return JSONResponse({"message": "Sprawdź dane formularza.", "errors": errors}, status_code=422)
+
+@app.exception_handler(DatabaseNotConfiguredError)
+async def database_not_configured(request: Request, error: DatabaseNotConfiguredError):
+    return JSONResponse({"message": "Baza danych nie jest skonfigurowana."}, status_code=503)
+
+
+@app.exception_handler(psycopg.Error)
+async def database_error(request: Request, error: psycopg.Error):
+    return JSONResponse({"message": "Baza danych jest niedostępna lub wymaga przygotowania schematu."}, status_code=503)
 
 class HealthResponse(BaseModel):
     status: Literal["ok", "error"]

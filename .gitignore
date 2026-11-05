@@ -20,4 +20,5 @@ dist/
 .DS_Store
 Thumbs.db
 
-Readme.md
+README.md
+migrations/
