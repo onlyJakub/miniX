@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Feed — MiniX</title>
+    <script type="module" src="/src/main.js"></script>
+  </head>
+  <body data-page="feed">
+    <main>
+      <section id="session-screen" class="session-screen" aria-label="Sprawdzanie sesji" aria-busy="true">
+        <p class="text-3xl font-bold">Mini<span class="text-sky-400">X</span></p>
+        <p id="session-status" class="message" role="status" aria-live="polite">Sprawdzanie sesji…</p>
+        <button id="retry-session" type="button" class="mt-5" hidden>Spróbuj ponownie</button>
+      </section>
+      <div id="page-content" hidden>
+        <header class="flex flex-wrap items-start justify-between gap-5 border-b border-slate-800 pb-6">
+          <div>
+            <a href="/" class="no-underline hover:no-underline" aria-label="MiniX — strona główna"><h1>Mini<span class="text-sky-400">X</span></h1></a>
+            <p class="hint">Twój feed. Twoje myśli.</p>
+          </div>
+          <div class="min-w-0 text-sm">
+            <p class="wrap-break-words">Zalogowano jako <strong id="current-username"></strong></p>
+            <p id="current-email" class="hint wrap-break-words"></p>
+            <button id="logout" type="button" class="button-secondary mt-3 text-sm">Wyloguj się</button>
+            <p id="logout-message" class="message" role="alert"></p>
+          </div>
+        </header>
+        <section id="post-composer" class="panel" aria-label="Publikowanie posta" hidden>
+          <form id="post-form">
+            <label for="post-content" class="text-xl">Co u Ciebie?</label>
+            <textarea id="post-content" name="content" rows="3" required placeholder="Podziel się tym, co masz na myśli…" aria-describedby="post-hint post-counter"></textarea>
+            <p id="post-hint" class="hint">Do 280 znaków. Białe znaki na brzegach zostaną usunięte.</p>
+            <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <span id="post-counter" class="text-sm text-slate-400" aria-live="polite">0/280</span>
+              <button id="publish-post" type="submit" disabled>Opublikuj</button>
+            </div>
+          </form>
+          <p id="post-action-message" class="message" role="status" aria-live="polite" aria-atomic="true"></p>
+        </section>
+        <section id="feed" class="mt-8" aria-labelledby="feed-heading">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="feed-heading">Najnowsze wpisy</h2>
+            <button id="refresh-posts" type="button" class="button-secondary text-sm">Odśwież feed</button>
+          </div>
+          <p id="feed-message" class="message" role="status" aria-live="polite" aria-atomic="true">Ładowanie postów…</p>
+          <div id="post-list" class="mt-4 space-y-4" aria-busy="true"></div>
+          <nav class="mt-6 flex flex-wrap items-center justify-between gap-3" aria-label="Strony feedu">
+            <button id="previous-page" type="button" class="button-secondary text-sm" disabled>Poprzednia</button>
+            <span id="page-label" class="text-sm text-slate-400" aria-live="polite">Strona 1</span>
+            <button id="next-page" type="button" class="button-secondary text-sm" disabled>Następna</button>
+          </nav>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

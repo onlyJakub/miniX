@@ -6,8 +6,14 @@
     <title>Logowanie — MiniX</title>
     <script type="module" src="/src/main.js"></script>
   </head>
-  <body>
+  <body data-page="login">
     <main>
+      <section id="session-screen" class="session-screen" aria-label="Sprawdzanie sesji" aria-busy="true">
+        <p class="text-3xl font-bold">Mini<span class="text-sky-400">X</span></p>
+        <p id="session-status" class="message" role="status" aria-live="polite">Sprawdzanie sesji…</p>
+        <button id="retry-session" type="button" class="mt-5" hidden>Spróbuj ponownie</button>
+      </section>
+      <div id="page-content" hidden>
       <a href="/">← MiniX</a>
       <section class="panel" aria-labelledby="login-heading">
         <h1 id="login-heading">Zaloguj się</h1>
@@ -24,8 +30,9 @@
           <button type="submit">Zaloguj się</button>
         </form>
         <p id="form-message" class="message" role="alert" aria-live="polite"></p>
-        <p class="mt-6 text-sm">Nie masz konta? <a href="/register.html">Zarejestruj się</a></p>
+        <p class="mt-6 text-sm">Nie masz konta? <a href="/register">Utwórz konto</a></p>
       </section>
+      </div>
     </main>
   </body>
 </html>

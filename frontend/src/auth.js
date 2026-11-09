@@ -16,13 +16,18 @@ export function setupAuthForm() {
   const message = document.querySelector('#form-message');
   const button = form.querySelector('button[type="submit"]');
   const passwordInput = form.elements.namedItem('password');
+  const events = new AbortController();
+  let active = true;
 
   if (!isRegistration && new URLSearchParams(window.location.search).get('registered') === '1') {
     message.dataset.kind = 'success';
     message.textContent = 'Konto zostało utworzone. Zaloguj się, aby kontynuować.';
+  } else if (!isRegistration && new URLSearchParams(window.location.search).get('expired') === '1') {
+    message.dataset.kind = 'error';
+    message.textContent = 'Sesja wygasła. Zaloguj się ponownie.';
   }
 
-  passwordInput.addEventListener('input', () => passwordInput.setCustomValidity(''));
+  passwordInput.addEventListener('input', () => passwordInput.setCustomValidity(''), { signal: events.signal });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (isRegistration && !passwordInput.value.trim()) {
@@ -40,15 +45,24 @@ export function setupAuthForm() {
 
     try {
       await apiRequest(`/auth/${isRegistration ? 'register' : 'login'}`, { method: 'POST', body: data });
+      if (!active) return;
       form.reset();
-      window.location.assign(isRegistration ? '/login.html?registered=1' : '/');
+      window.location.replace(isRegistration ? '/login?registered=1' : '/feed');
     } catch (error) {
+      if (!active) return;
       message.dataset.kind = 'error';
       message.textContent = error.message;
       passwordInput.value = '';
       passwordInput.focus();
     } finally {
-      button.disabled = false;
+      if (active) button.disabled = false;
     }
-  });
+  }, { signal: events.signal });
+  return () => {
+    active = false;
+    events.abort();
+    form.reset();
+    passwordInput.setCustomValidity('');
+    button.disabled = false;
+  };
 }

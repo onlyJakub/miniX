@@ -28,7 +28,7 @@ def get_auth_settings() -> AuthSettings:
 
     origins = tuple(
         value.strip() for value in os.getenv(
-            "AUTH_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:8000"
+            "AUTH_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4173,http://localhost:4173,http://127.0.0.1:8000"
         ).split(",") if value.strip()
     )
     if not origins:

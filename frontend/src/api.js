@@ -17,6 +17,8 @@ export async function apiRequest(path, { method = 'GET', body } = {}) {
     throw new Error('Nie można połączyć się z API. Sprawdź, czy frontend i backend są uruchomione.');
   }
 
+  if (response.status === 204) return null;
+
   let data;
 
   try {

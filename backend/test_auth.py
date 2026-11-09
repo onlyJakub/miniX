@@ -1,93 +1,21 @@
 """Testy integracyjne"""
 import os
-import secrets
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from unittest.mock import patch
 from uuid import uuid4
 import jwt
 import psycopg
 from fastapi.testclient import TestClient
 from psycopg import sql
-from psycopg.rows import dict_row
 from backend.auth import COOKIE_NAME, COOKIE_PATH, password_hasher
 from backend.config import get_auth_settings
 from backend.main import app
 
-ROOT = Path(__file__).resolve().parents[1]
-ORIGIN = "http://127.0.0.1:5173"
-TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "")
+from backend.test_support import DatabaseTestCase, ORIGIN, ROOT, TEST_DATABASE_URL
 
-@unittest.skipUnless(TEST_DATABASE_URL, "Ustaw TEST_DATABASE_URL do PostgreSQL z prawem CREATE SCHEMA.")
-class AuthenticationTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.schema_name = "minix_test_" + uuid4().hex
-        cls.environment = patch.dict(os.environ, {
-            "JWT_SECRET": secrets.token_urlsafe(48),
-            "COOKIE_SECURE": "false", "AUTH_ORIGINS": ORIGIN,
-            "JWT_EXPIRE_MINUTES": "60",
-        })
-        cls.environment.start()
-        get_auth_settings.cache_clear()
-        with psycopg.connect(TEST_DATABASE_URL, autocommit=True, connect_timeout=3) as connection:
-            connection.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(cls.schema_name)))
-        try:
-            with cls.connect() as connection:
-                connection.execute((ROOT / "schema.sql").read_text(encoding="utf-8"))
-            cls.database_patch = patch("backend.auth.get_connection", side_effect=cls.connect)
-            cls.health_patch = patch("backend.main.get_connection", side_effect=cls.connect)
-            cls.database_patch.start()
-            cls.health_patch.start()
-            cls.client_context = TestClient(app, base_url="http://testserver", headers={"Origin": ORIGIN})
-            cls.client = cls.client_context.__enter__()
-        except BaseException:
-            cls.cleanup_schema()
-            cls.environment.stop()
-            get_auth_settings.cache_clear()
-            raise
-
-    @classmethod
-    def connect(cls):
-        return psycopg.connect(
-            TEST_DATABASE_URL, row_factory=dict_row, connect_timeout=3,
-            options=f"-c search_path={cls.schema_name} -c statement_timeout=5000",
-        )
-
-    @classmethod
-    def cleanup_schema(cls):
-        with psycopg.connect(TEST_DATABASE_URL, autocommit=True, connect_timeout=3) as connection:
-            connection.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(cls.schema_name)))
-
-    @classmethod
-    def tearDownClass(cls):
-        try:
-            cls.client_context.__exit__(None, None, None)
-            cls.database_patch.stop()
-            cls.health_patch.stop()
-            cls.cleanup_schema()
-        finally:
-            cls.environment.stop()
-            get_auth_settings.cache_clear()
-
-    def setUp(self):
-        self.client.cookies.clear()
-        suffix = uuid4().hex[:12]
-        self.account = {"username": "user_" + suffix, "email": suffix + "@example.com", "password": "Test_password_123!"}
-
-    def register(self, **changes):
-        return self.client.post("/api/auth/register", json=self.account | changes)
-
-    def login(self, **changes):
-        return self.client.post("/api/auth/login", json={"identifier": self.account["username"], "password": self.account["password"]} | changes)
-
-    def create_and_login(self):
-        self.assertEqual(self.register().status_code, 201)
-        response = self.login()
-        self.assertEqual(response.status_code, 200)
-        return response
+class AuthenticationTests(DatabaseTestCase):
 
     def test_register_stores_only_argon2id_hash(self):
         response = self.register()

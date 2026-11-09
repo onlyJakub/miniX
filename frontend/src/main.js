@@ -1,73 +1,111 @@
 import './style.css';
 import { checkHealth } from './api.js';
 import { getCurrentUser, logout, setupAuthForm } from './auth.js';
+import { setupPosts } from './posts.js';
 
-setupAuthForm();
+const page = document.body.dataset.page;
+const content = document.querySelector('#page-content');
+const screen = document.querySelector('#session-screen');
+const status = document.querySelector('#session-status');
+const retryButton = document.querySelector('#retry-session');
+let postsUI = null;
+let cleanupAuthForm = null;
+let sessionCheck = 0;
 
-const checkButton = document.querySelector('#check-health');
-const statusMessage = document.querySelector('#health-status');
+function hideContent() {
+  content.hidden = true;
+  postsUI?.clear();
+  postsUI = null;
+  cleanupAuthForm?.();
+  cleanupAuthForm = null;
+  for (const selector of ['#current-username', '#current-email', '#logout-message', '#form-message']) {
+    const element = document.querySelector(selector);
+    if (element) element.textContent = '';
+  }
+  document.querySelector('#auth-form')?.reset();
+  screen.hidden = false;
+  screen.setAttribute('aria-busy', 'true');
+  status.textContent = 'Sprawdzanie sesji…';
+  retryButton.hidden = true;
+}
 
-checkButton?.addEventListener('click', async () => {
-  checkButton.disabled = true;
-  checkButton.textContent = 'Sprawdzanie…';
-  statusMessage.textContent = 'Łączenie z API i bazą danych…';
+function redirect(path) {
+  sessionCheck += 1;
+  hideContent();
+  window.location.replace(path);
+}
 
+function showContent() {
+  screen.hidden = true;
+  screen.setAttribute('aria-busy', 'false');
+  content.hidden = false;
+}
+
+async function checkSession() {
+  const check = ++sessionCheck;
+  hideContent();
+  let user;
   try {
-    const data = await checkHealth();
-    statusMessage.textContent = data.message;
+    user = await getCurrentUser();
   } catch (error) {
-    statusMessage.textContent = error.message;
+    if (check !== sessionCheck) return;
+    if (error.status !== 401) {
+      screen.setAttribute('aria-busy', 'false');
+      status.textContent = error.message;
+      retryButton.hidden = false;
+      return;
+    }
+    if (page === 'feed') {
+      redirect('/login');
+      return;
+    }
+    cleanupAuthForm = setupAuthForm();
+    showContent();
+    return;
+  }
+  if (check !== sessionCheck) return;
+  if (page !== 'feed') {
+    redirect('/feed');
+    return;
+  }
+  document.querySelector('#current-username').textContent = user.username;
+  document.querySelector('#current-email').textContent = user.email;
+  postsUI = setupPosts({ user, onUnauthorized: () => redirect('/login?expired=1') });
+  showContent();
+}
+
+retryButton.addEventListener('click', checkSession);
+document.querySelector('#logout')?.addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  try {
+    await logout();
+    redirect('/');
+  } catch (error) {
+    document.querySelector('#logout-message').textContent = error.message;
   } finally {
-    checkButton.disabled = false;
-    checkButton.textContent = 'Sprawdź połączenie';
+    button.disabled = false;
   }
 });
 
-const guestPanel = document.querySelector('#guest-panel');
-const userPanel = document.querySelector('#user-panel');
-const sessionMessage = document.querySelector('#session-message');
-
-function showGuest() {
-  guestPanel.hidden = false;
-  userPanel.hidden = true;
-  document.querySelector('#current-username').textContent = '';
-  document.querySelector('#current-email').textContent = '';
-}
-
-async function loadSession() {
+const healthButton = document.querySelector('#check-health');
+healthButton?.addEventListener('click', async () => {
+  const message = document.querySelector('#health-status');
+  healthButton.disabled = true;
+  message.textContent = 'Sprawdzanie połączenia…';
   try {
-    const user = await getCurrentUser();
-    guestPanel.hidden = true;
-    userPanel.hidden = false;
-    document.querySelector('#current-username').textContent = user.username;
-    document.querySelector('#current-email').textContent = user.email;
-    sessionMessage.textContent = '';
+    const result = await checkHealth();
+    message.textContent = result.message;
   } catch (error) {
-    if (error.status === 401) {
-      showGuest();
-      sessionMessage.textContent = 'Zaloguj się lub utwórz konto.';
-    } else {
-      sessionMessage.dataset.kind = 'error';
-      sessionMessage.textContent = error.message;
-    }
+    message.textContent = error.message;
+  } finally {
+    healthButton.disabled = false;
   }
-}
+});
 
-if (sessionMessage) {
-  loadSession();
-  document.querySelector('#logout').addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    button.disabled = true;
-    try {
-      const result = await logout();
-      showGuest();
-      sessionMessage.dataset.kind = 'success';
-      sessionMessage.textContent = result.message;
-    } catch (error) {
-      sessionMessage.dataset.kind = 'error';
-      sessionMessage.textContent = error.message;
-    } finally {
-      button.disabled = false;
-    }
-  });
-}
+window.addEventListener('pagehide', () => {
+  sessionCheck += 1;
+  hideContent();
+});
+window.addEventListener('pageshow', (event) => { if (event.persisted) checkSession(); });
+checkSession();

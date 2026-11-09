@@ -3,35 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MiniX</title>
+    <meta name="description" content="MiniX — miejsce na Twoje myśli i codzienne rozmowy." />
+    <title>Witaj w MiniX</title>
     <script type="module" src="/src/main.js"></script>
   </head>
-  <body>
-    <main>
-      <header>
-        <h1>Mini<span class="text-sky-400">X</span></h1>
-        <p class="hint">Twoje konto w MiniX.</p>
-      </header>
-      <section class="panel" aria-labelledby="account-heading">
-        <h2 id="account-heading">Konto użytkownika</h2>
-        <p id="session-message" class="message" role="status" aria-live="polite">Sprawdzanie sesji…</p>
-        <nav id="guest-panel" aria-label="Konto" hidden>
-          <div class="mt-5 flex flex-wrap gap-5">
-            <a href="/login.html">Zaloguj się</a>
-            <a href="/register.html">Zarejestruj się</a>
-          </div>
-        </nav>
-        <div id="user-panel" hidden>
-          <p class="mt-4 break-words">Zalogowano jako <strong id="current-username"></strong>.</p>
-          <p id="current-email" class="hint break-words"></p>
-          <button id="logout" type="button" class="mt-5">Wyloguj się</button>
+  <body data-page="welcome">
+    <main class="welcome-layout">
+      <section id="session-screen" class="session-screen" aria-label="Sprawdzanie sesji" aria-busy="true">
+        <p class="text-3xl font-bold">Mini<span class="text-sky-400">X</span></p>
+        <p id="session-status" class="message" role="status" aria-live="polite">Sprawdzanie sesji…</p>
+        <button id="retry-session" type="button" class="mt-5" hidden>Spróbuj ponownie</button>
+      </section>
+      <div id="page-content" class="welcome-grid" hidden>
+        <div>
+          <p class="welcome-mark" aria-label="MiniX">Mini<span class="text-sky-400">X</span></p>
+          <p class="mt-5 text-base text-slate-400">Krótkie wpisy. Wspólna przestrzeń.</p>
         </div>
-      </section>
-      <section class="panel" aria-labelledby="health-heading">
-        <h2 id="health-heading">Test połączenia</h2>
-        <button id="check-health" type="button" class="mt-4">Sprawdź połączenie</button>
-        <p id="health-status" class="message" role="status" aria-live="polite" aria-atomic="true">Test nie został jeszcze uruchomiony.</p>
-      </section>
+        <section aria-labelledby="welcome-heading" class="max-w-md">
+          <p class="mb-5 text-sm font-medium uppercase tracking-widest text-sky-300">Twoje miejsce na rozmowę</p>
+          <h1 id="welcome-heading" class="text-4xl leading-tight sm:text-5xl">Tu zaczyna się rozmowa.</h1>
+          <p class="mt-6 leading-relaxed text-slate-400">Podziel się myślą, zobacz, co słychać u innych, i dołącz do MiniX.</p>
+          <nav class="mt-9 flex flex-col gap-4" aria-label="Dołącz do MiniX">
+            <a class="button-link" href="/login">Zaloguj się</a>
+            <a class="button-link button-secondary" href="/register">Utwórz konto</a>
+          </nav>
+          <p class="mt-6 text-sm text-slate-500">Twoja następna myśl zasługuje na własny wpis.</p>
+        </section>
+      </div>
     </main>
   </body>
 </html>

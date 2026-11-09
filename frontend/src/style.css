@@ -8,13 +8,23 @@
   a { @apply text-sky-300 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-300; }
   label { @apply block text-sm font-medium; }
   input { @apply mt-2 block w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2.5 text-base focus:border-sky-400 focus:outline-2 focus:outline-sky-400; }
+  textarea { @apply mt-3 block w-full resize-y rounded-lg border border-slate-600 bg-slate-950 px-3 py-3 text-base focus:border-sky-400 focus:outline-2 focus:outline-sky-400; }
   button { @apply cursor-pointer rounded-lg bg-sky-400 px-4 py-2.5 font-semibold text-slate-950 hover:bg-sky-300 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-300 disabled:cursor-wait disabled:opacity-60; }
 }
 
 @layer components {
+  .session-screen { @apply flex min-h-[65vh] flex-col items-start justify-center; }
+  .welcome-layout { @apply max-w-6xl; }
+  .welcome-grid { @apply grid min-h-[75vh] items-center gap-12 py-8 md:grid-cols-2 md:gap-16; }
+  .welcome-mark { @apply text-[clamp(5rem,13vw,10rem)] leading-none font-bold tracking-tighter; }
+  .button-link { @apply inline-flex min-h-12 items-center justify-center rounded-full border border-transparent bg-sky-400 px-6 py-3 font-semibold text-slate-950 no-underline transition-colors hover:bg-sky-300 hover:no-underline; }
   .panel { @apply mt-8 rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-8; }
   .message { @apply mt-4 break-words text-sm leading-relaxed; }
   .message[data-kind="error"] { @apply text-rose-300; }
   .message[data-kind="success"] { @apply text-emerald-300; }
   .hint { @apply mt-2 text-sm leading-relaxed text-slate-400; }
+  .button-secondary { @apply border border-slate-600 bg-transparent font-medium text-slate-200 hover:border-sky-400 hover:bg-slate-800; }
+  .post-card { @apply rounded-2xl border border-slate-700 bg-slate-900 p-5 transition-colors hover:border-slate-500 sm:p-6; }
+  .post-text { @apply mt-3 whitespace-pre-wrap leading-relaxed [overflow-wrap:anywhere]; }
+  #post-counter[data-kind="error"] { @apply text-rose-300; }
 }
