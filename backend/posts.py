@@ -1,5 +1,5 @@
 from datetime import timezone
-from typing import Annotated, Literal
+from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_serializer, field_validator
 from .auth import UserResponse, get_current_user, require_trusted_origin
@@ -33,7 +33,8 @@ class PostResponse(BaseModel):
     content: str
     created_at: AwareDatetime
     author: PostAuthor
-    likes_count: Literal[0] = 0
+    likes_count: int = Field(default=0, ge=0)
+    liked_by_me: bool = False
 
     @field_serializer("created_at")
     def serialize_date(self, value):
@@ -47,15 +48,23 @@ def list_posts(
 ) -> list[PostResponse]:
     with get_connection() as connection:
         rows = connection.execute(
-            "SELECT p.id, p.content, p.created_at, u.id AS author_id, u.username "
-            "FROM posts AS p JOIN users AS u ON u.id = p.user_id "
-            "ORDER BY p.created_at DESC, p.id DESC LIMIT %s OFFSET %s",
-            (limit, offset),
+            "WITH page AS ("
+            "SELECT id, user_id, content, created_at FROM posts "
+            "ORDER BY created_at DESC, id DESC LIMIT %s OFFSET %s"
+            ") "
+            "SELECT p.id, p.content, p.created_at, u.id AS author_id, u.username, "
+            "COUNT(l.id) AS likes_count, COALESCE(BOOL_OR(l.user_id = %s), FALSE) AS liked_by_me "
+            "FROM page AS p JOIN users AS u ON u.id = p.user_id "
+            "LEFT JOIN likes AS l ON l.post_id = p.id "
+            "GROUP BY p.id, p.content, p.created_at, u.id "
+            "ORDER BY p.created_at DESC, p.id DESC",
+            (limit, offset, user.id),
         ).fetchall()
     return [
         PostResponse(
             id=row["id"], content=row["content"], created_at=row["created_at"],
             author=PostAuthor(id=row["author_id"], username=row["username"]),
+            likes_count=row["likes_count"], liked_by_me=row["liked_by_me"],
         )
         for row in rows
     ]
@@ -68,6 +77,37 @@ def create_post(data: PostInput, user: CurrentUser) -> PostResponse:
             (user.id, data.content),
         ).fetchone()
     return PostResponse(**row, author=PostAuthor(id=user.id, username=user.username))
+
+class PostLikeResponse(BaseModel):
+    likes_count: int = Field(ge=0)
+    liked_by_me: bool
+
+def set_post_like(post_id: int, user_id: int, liked: bool) -> PostLikeResponse:
+    with get_connection() as connection:
+        post = connection.execute("SELECT id FROM posts WHERE id = %s FOR UPDATE", (post_id,)).fetchone()
+        if post is None:
+            raise HTTPException(404, "Post nie istnieje.")
+        if liked:
+            connection.execute(
+                "INSERT INTO likes (user_id, post_id) VALUES (%s, %s) "
+                "ON CONFLICT (user_id, post_id) DO NOTHING",
+                (user_id, post_id),
+            )
+        else:
+            connection.execute("DELETE FROM likes WHERE user_id = %s AND post_id = %s", (user_id, post_id))
+        count = connection.execute(
+            "SELECT COUNT(*) AS likes_count FROM likes WHERE post_id = %s", (post_id,)
+        ).fetchone()["likes_count"]
+    return PostLikeResponse(likes_count=count, liked_by_me=liked)
+
+@router.post("/{post_id}/like", response_model=PostLikeResponse, dependencies=[Depends(require_trusted_origin)])
+def like_post(post_id: PostId, user: CurrentUser) -> PostLikeResponse:
+    return set_post_like(post_id, user.id, True)
+
+
+@router.delete("/{post_id}/like", response_model=PostLikeResponse, dependencies=[Depends(require_trusted_origin)])
+def unlike_post(post_id: PostId, user: CurrentUser) -> PostLikeResponse:
+    return set_post_like(post_id, user.id, False)
 
 @router.delete("/{post_id}", status_code=204, response_class=Response, dependencies=[Depends(require_trusted_origin)])
 def delete_post(post_id: PostId, user: CurrentUser) -> Response:

@@ -52,6 +52,12 @@ export function setupPosts({ user, onUnauthorized } = {}) {
     updateControls();
   }
 
+  function updateLikeButton(button, post) {
+    button.setAttribute('aria-pressed', String(post.liked_by_me));
+    button.setAttribute('aria-label', `${post.liked_by_me ? 'Cofnij polubienie' : 'Polub post'}, liczba polubień ${post.likes_count}`);
+    button.querySelector('span').textContent = String(post.likes_count);
+  }
+
   function renderPosts() {
     const fragment = document.createDocumentFragment();
     for (const post of posts) {
@@ -75,15 +81,27 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       text.textContent = post.content;
       article.append(header, text);
 
+      const actions = document.createElement('div');
+      actions.className = 'mt-4 flex items-center gap-4';
+      const likeButton = document.createElement('button');
+      likeButton.type = 'button';
+      likeButton.className = 'like-button';
+      likeButton.disabled = busy;
+      likeButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-9-5.5-9-12a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-9 12-9 12Z"/></svg><span aria-hidden="true"></span>';
+      updateLikeButton(likeButton, post);
+      likeButton.addEventListener('click', () => toggleLike(post, likeButton));
+      actions.append(likeButton);
+
       if (currentUser && currentUser.id === post.author.id) {
         const deleteButton = document.createElement('button');
         deleteButton.type = 'button';
-        deleteButton.className = 'button-secondary mt-4 text-sm';
+        deleteButton.className = 'button-secondary text-sm';
         deleteButton.textContent = 'Usuń post';
         deleteButton.disabled = busy;
         deleteButton.addEventListener('click', () => removePost(post.id, deleteButton));
-        article.append(deleteButton);
+        actions.append(deleteButton);
       }
+      article.append(actions);
       fragment.append(article);
     }
     list.replaceChildren(fragment);
@@ -105,6 +123,27 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       if (disposed) return;
       if (error.status === 401) { onUnauthorized?.(); return; }
       showMessage(feedMessage, error.message, 'error');
+    } finally {
+      if (!disposed) setBusy(false);
+    }
+  }
+
+  async function toggleLike(post, button) {
+    if (disposed || busy || !currentUser) return;
+    setBusy(true);
+    showMessage(actionMessage, 'Zapisywanie polubienia…');
+    try {
+      const result = await apiRequest(`/posts/${post.id}/like`, { method: post.liked_by_me ? 'DELETE' : 'POST' });
+      if (disposed) return;
+      post.likes_count = result.likes_count;
+      post.liked_by_me = result.liked_by_me;
+      updateLikeButton(button, post);
+      showMessage(actionMessage, post.liked_by_me ? 'Polubiono post.' : 'Cofnięto polubienie.', 'success');
+    } catch (error) {
+      if (disposed) return;
+      if (error.status === 401) { onUnauthorized?.(); return; }
+      showMessage(actionMessage, error.message, 'error');
+      if (error.status === 404) await loadPage(0);
     } finally {
       if (!disposed) setBusy(false);
     }

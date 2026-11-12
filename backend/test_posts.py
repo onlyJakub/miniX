@@ -26,9 +26,10 @@ class PostsTests(DatabaseTestCase):
 
     def test_create_persists_content_and_session_author(self):
         user, post = self.own_post()
-        self.assertEqual(set(post), {"id", "content", "created_at", "author", "likes_count"})
+        self.assertEqual(set(post), {"id", "content", "created_at", "author", "likes_count", "liked_by_me"})
         self.assertEqual(post["author"], {"id": user["id"], "username": user["username"]})
         self.assertEqual(post["likes_count"], 0)
+        self.assertFalse(post["liked_by_me"])
         self.assertTrue(post["created_at"].endswith("Z"))
         self.assertIsNotNone(datetime.fromisoformat(post["created_at"]).tzinfo)
         with self.connect() as connection:
@@ -217,7 +218,6 @@ class PostsTests(DatabaseTestCase):
 
     def test_existing_likes_foreign_key_cascades_when_post_deleted(self):
         user, post = self.own_post()
-        # Sprawdzamy istniejącą relację FK, bez dodawania endpointów systemu polubień.
         with self.connect() as connection:
             connection.execute("INSERT INTO likes (user_id, post_id) VALUES (%s, %s)", (user["id"], post["id"]))
         self.assertEqual(self.client.delete(f'/api/posts/{post["id"]}').status_code, 204)
