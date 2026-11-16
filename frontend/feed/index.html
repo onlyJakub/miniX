@@ -26,6 +26,10 @@
             <p id="logout-message" class="message" role="alert"></p>
           </div>
         </header>
+        <div class="feed-tabs" role="tablist" aria-label="Widok feedu">
+          <button id="for-you-tab" class="feed-tab" type="button" role="tab" aria-selected="true" aria-controls="feed">Dla Ciebie</button>
+          <button id="trending-tab" class="feed-tab" type="button" role="tab" aria-selected="false" aria-controls="feed" tabindex="-1">Popularne 🔥</button>
+        </div>
         <section id="post-composer" class="panel" aria-label="Publikowanie posta" hidden>
           <form id="post-form">
             <label for="post-content" class="text-xl">Co u Ciebie?</label>
@@ -36,16 +40,16 @@
               <button id="publish-post" type="submit" disabled>Opublikuj</button>
             </div>
           </form>
-          <p id="post-action-message" class="message" role="status" aria-live="polite" aria-atomic="true"></p>
         </section>
-        <section id="feed" class="mt-8" aria-labelledby="feed-heading">
+        <p id="post-action-message" class="message" role="status" aria-live="polite" aria-atomic="true"></p>
+        <section id="feed" class="mt-8" role="tabpanel" aria-labelledby="for-you-tab">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <h2 id="feed-heading">Najnowsze wpisy</h2>
             <button id="refresh-posts" type="button" class="button-secondary text-sm">Odśwież feed</button>
           </div>
           <p id="feed-message" class="message" role="status" aria-live="polite" aria-atomic="true">Ładowanie postów…</p>
           <div id="post-list" class="mt-4 space-y-4" aria-busy="true"></div>
-          <nav class="mt-6 flex flex-wrap items-center justify-between gap-3" aria-label="Strony feedu">
+          <nav id="feed-pagination" class="mt-6 flex flex-wrap items-center justify-between gap-3" aria-label="Strony feedu">
             <button id="previous-page" type="button" class="button-secondary text-sm" disabled>Poprzednia</button>
             <span id="page-label" class="text-sm text-slate-400" aria-live="polite">Strona 1</span>
             <button id="next-page" type="button" class="button-secondary text-sm" disabled>Następna</button>

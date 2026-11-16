@@ -40,6 +40,16 @@ class PostResponse(BaseModel):
     def serialize_date(self, value):
         return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
+def posts_from_rows(rows) -> list[PostResponse]:
+    return [
+        PostResponse(
+            id=row["id"], content=row["content"], created_at=row["created_at"],
+            author=PostAuthor(id=row["author_id"], username=row["username"]),
+            likes_count=row["likes_count"], liked_by_me=row["liked_by_me"],
+        )
+        for row in rows
+    ]
+
 @router.get("", response_model=list[PostResponse])
 def list_posts(
     user: CurrentUser,
@@ -60,14 +70,27 @@ def list_posts(
             "ORDER BY p.created_at DESC, p.id DESC",
             (limit, offset, user.id),
         ).fetchall()
-    return [
-        PostResponse(
-            id=row["id"], content=row["content"], created_at=row["created_at"],
-            author=PostAuthor(id=row["author_id"], username=row["username"]),
-            likes_count=row["likes_count"], liked_by_me=row["liked_by_me"],
-        )
-        for row in rows
-    ]
+    return posts_from_rows(rows)\
+
+@router.get("/trending", response_model=list[PostResponse])
+def trending_posts(user: CurrentUser) -> list[PostResponse]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT p.id, p.content, p.created_at, u.id AS author_id, u.username,
+                   COUNT(l.id) AS likes_count,
+                   COALESCE(BOOL_OR(l.user_id = %s), FALSE) AS liked_by_me
+            FROM posts AS p
+            JOIN users AS u ON u.id = p.user_id
+            LEFT JOIN likes AS l ON l.post_id = p.id
+            WHERE p.created_at BETWEEN NOW() - INTERVAL '24 hours' AND NOW()
+            GROUP BY p.id, u.id
+            ORDER BY likes_count DESC, p.created_at DESC, p.id DESC
+            LIMIT 3
+            """,
+            (user.id,),
+        ).fetchall()
+    return posts_from_rows(rows)
 
 @router.post("", status_code=201, response_model=PostResponse, dependencies=[Depends(require_trusted_origin)])
 def create_post(data: PostInput, user: CurrentUser) -> PostResponse:

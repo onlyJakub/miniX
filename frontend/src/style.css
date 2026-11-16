@@ -30,5 +30,9 @@
   .like-button[aria-pressed="true"] { @apply text-rose-400; }
   .like-button svg { @apply h-5 w-5 fill-none stroke-current; stroke-width: 1.8; }
   .like-button[aria-pressed="true"] svg { fill: currentColor; }
+  .feed-tabs { @apply mt-6 grid grid-cols-2 border-b border-slate-800; }
+  .feed-tab { @apply relative min-h-14 rounded-none bg-transparent px-2 text-sm font-semibold text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-slate-100 sm:text-base; }
+  .feed-tab[aria-selected="true"] { @apply text-slate-100; }
+  .feed-tab[aria-selected="true"]::after { content: ''; @apply absolute right-1/4 bottom-0 left-1/4 h-1 rounded-full bg-sky-400; }
   #post-counter[data-kind="error"] { @apply text-rose-300; }
 }
