@@ -110,7 +110,7 @@ class TrendingTests(DatabaseTestCase):
         post_id = self.make_post(likes=2, content=text)
         self.assertEqual(self.client.post(f"/api/posts/{post_id}/like").status_code, 200)
         post = self.ranking()[0]
-        self.assertEqual(set(post), {"id", "content", "created_at", "author", "likes_count", "liked_by_me"})
+        self.assertEqual(set(post), {"id", "content", "created_at", "is_anonymous", "author", "is_owner", "likes_count", "liked_by_me"})
         self.assertEqual(post["content"], text)
         self.assertEqual(post["author"], {"id": self.user["id"], "username": self.user["username"]})
         self.assertEqual(post["likes_count"], 3)

@@ -16,6 +16,7 @@ CREATE TABLE posts (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     content VARCHAR(280) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    is_anonymous BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT posts_content_not_blank CHECK (content ~ '[^[:space:]]')
 );
 

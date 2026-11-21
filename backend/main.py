@@ -43,6 +43,7 @@ async def validation_error(request: Request, error: RequestValidationError):
         "password": "Podaj prawidłowe hasło (rejestracja: 8–128 znaków).",
         "identifier": "Podaj login lub e-mail (maksymalnie 255 znaków).",
         "content": "Podaj niepusty tekst do 280 znaków, bez niedozwolonych znaków sterujących.",
+        "is_anonymous": "Wybierz true lub false dla publikowania anonimowego.",
         "limit": "Limit musi być liczbą całkowitą od 1 do 50.",
         "offset": "Offset musi być nieujemną liczbą całkowitą mieszczącą się w zakresie bigint.",
         "post_id": "Identyfikator posta musi być dodatnią liczbą całkowitą z zakresu INTEGER.",

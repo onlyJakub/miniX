@@ -14,6 +14,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
   const composer = document.querySelector('#post-composer');
   const form = document.querySelector('#post-form');
   const content = document.querySelector('#post-content');
+  const anonymous = document.querySelector('#post-anonymous');
   const counter = document.querySelector('#post-counter');
   const publishButton = document.querySelector('#publish-post');
   const previousButton = document.querySelector('#previous-page');
@@ -48,6 +49,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
     counter.dataset.kind = length > 280 ? 'error' : '';
     publishButton.disabled = busy || !currentUser || length === 0 || length > 280;
     content.disabled = busy;
+    anonymous.disabled = busy;
     previousButton.disabled = busy || offset === 0;
     nextButton.disabled = busy || !hasNext;
     refreshButton.disabled = busy;
@@ -90,7 +92,8 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       header.className = 'flex flex-wrap items-start justify-between gap-3';
       const author = document.createElement('h3');
       author.className = 'min-w-0 font-semibold text-sky-200 [overflow-wrap:anywhere]';
-      author.textContent = trending ? `🔥 ${index + 1}. @${post.author.username}` : `@${post.author.username}`;
+      const authorName = post.is_anonymous ? 'Gall Anonim' : `@${post.author.username}`;
+      author.textContent = trending ? `🔥 ${index + 1}. ${authorName}` : authorName;
       const date = document.createElement('time');
       date.className = 'text-xs leading-6 text-slate-400';
       date.dateTime = post.created_at;
@@ -114,7 +117,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       likeButton.addEventListener('click', () => toggleLike(post, likeButton));
       actions.append(likeButton);
 
-      if (currentUser && currentUser.id === post.author.id) {
+      if (post.is_owner) {
         const deleteButton = document.createElement('button');
         deleteButton.type = 'button';
         deleteButton.className = 'button-secondary text-sm';
@@ -223,9 +226,10 @@ export function setupPosts({ user, onUnauthorized } = {}) {
     publishButton.textContent = 'Publikowanie…';
     showMessage(actionMessage, 'Publikowanie posta…');
     try {
-      await apiRequest('/posts', { method: 'POST', body: { content: content.value } });
+      await apiRequest('/posts', { method: 'POST', body: { content: content.value, is_anonymous: anonymous.checked } });
       if (disposed) return;
       content.value = '';
+      anonymous.checked = false;
       showMessage(actionMessage, 'Post został opublikowany.', 'success');
       await loadPage(0);
     } catch (error) {
@@ -266,6 +270,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       currentUser = null;
       posts = [];
       content.value = '';
+      anonymous.checked = false;
       counter.textContent = '0/280';
       list.replaceChildren();
       actionMessage.textContent = '';

@@ -35,6 +35,10 @@
             <label for="post-content" class="text-xl">Co u Ciebie?</label>
             <textarea id="post-content" name="content" rows="3" required placeholder="Podziel się tym, co masz na myśli…" aria-describedby="post-hint post-counter"></textarea>
             <p id="post-hint" class="hint">Do 280 znaków. Białe znaki na brzegach zostaną usunięte.</p>
+            <label for="post-anonymous" class="mt-4 flex items-center gap-3">
+              <input id="post-anonymous" name="is_anonymous" type="checkbox" class="anonymous-checkbox" aria-describedby="anonymous-hint" />
+              <span>Opublikuj anonimowo</span>
+            </label>
             <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
               <span id="post-counter" class="text-sm text-slate-400" aria-live="polite">0/280</span>
               <button id="publish-post" type="submit" disabled>Opublikuj</button>

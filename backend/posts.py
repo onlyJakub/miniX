@@ -11,6 +11,7 @@ PostId = Annotated[int, Path(ge=1, le=2147483647)]
 class PostInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     content: str = Field(min_length=1, max_length=280)
+    is_anonymous: bool = Field(default=False, strict=True)
 
     @field_validator("content", mode="before")
     @classmethod
@@ -32,7 +33,9 @@ class PostResponse(BaseModel):
     id: int
     content: str
     created_at: AwareDatetime
-    author: PostAuthor
+    is_anonymous: bool
+    author: PostAuthor | None
+    is_owner: bool
     likes_count: int = Field(default=0, ge=0)
     liked_by_me: bool = False
 
@@ -40,15 +43,14 @@ class PostResponse(BaseModel):
     def serialize_date(self, value):
         return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
-def posts_from_rows(rows) -> list[PostResponse]:
-    return [
-        PostResponse(
-            id=row["id"], content=row["content"], created_at=row["created_at"],
-            author=PostAuthor(id=row["author_id"], username=row["username"]),
-            likes_count=row["likes_count"], liked_by_me=row["liked_by_me"],
-        )
-        for row in rows
-    ]
+def post_from_row(row, current_user_id: int) -> PostResponse:
+    return PostResponse(
+        id=row["id"], content=row["content"], created_at=row["created_at"],
+        is_anonymous=row["is_anonymous"],
+        author=None if row["is_anonymous"] else PostAuthor(id=row["user_id"], username=row["username"]),
+        is_owner=row["user_id"] == current_user_id,
+        likes_count=row.get("likes_count", 0), liked_by_me=row.get("liked_by_me", False),
+    )
 
 @router.get("", response_model=list[PostResponse])
 def list_posts(
@@ -59,25 +61,25 @@ def list_posts(
     with get_connection() as connection:
         rows = connection.execute(
             "WITH page AS ("
-            "SELECT id, user_id, content, created_at FROM posts "
+            "SELECT id, user_id, content, created_at, is_anonymous FROM posts "
             "ORDER BY created_at DESC, id DESC LIMIT %s OFFSET %s"
             ") "
-            "SELECT p.id, p.content, p.created_at, u.id AS author_id, u.username, "
+            "SELECT p.id, p.user_id, p.content, p.created_at, p.is_anonymous, u.username, "
             "COUNT(l.id) AS likes_count, COALESCE(BOOL_OR(l.user_id = %s), FALSE) AS liked_by_me "
             "FROM page AS p JOIN users AS u ON u.id = p.user_id "
             "LEFT JOIN likes AS l ON l.post_id = p.id "
-            "GROUP BY p.id, p.content, p.created_at, u.id "
+            "GROUP BY p.id, p.user_id, p.content, p.created_at, p.is_anonymous, u.id "
             "ORDER BY p.created_at DESC, p.id DESC",
             (limit, offset, user.id),
         ).fetchall()
-    return posts_from_rows(rows)\
+    return [post_from_row(row, user.id) for row in rows]
 
 @router.get("/trending", response_model=list[PostResponse])
 def trending_posts(user: CurrentUser) -> list[PostResponse]:
     with get_connection() as connection:
         rows = connection.execute(
             """
-            SELECT p.id, p.content, p.created_at, u.id AS author_id, u.username,
+            SELECT p.id, p.user_id, p.content, p.created_at, p.is_anonymous, u.username,
                    COUNT(l.id) AS likes_count,
                    COALESCE(BOOL_OR(l.user_id = %s), FALSE) AS liked_by_me
             FROM posts AS p
@@ -90,16 +92,17 @@ def trending_posts(user: CurrentUser) -> list[PostResponse]:
             """,
             (user.id,),
         ).fetchall()
-    return posts_from_rows(rows)
+    return [post_from_row(row, user.id) for row in rows]
 
 @router.post("", status_code=201, response_model=PostResponse, dependencies=[Depends(require_trusted_origin)])
 def create_post(data: PostInput, user: CurrentUser) -> PostResponse:
     with get_connection() as connection:
         row = connection.execute(
-            "INSERT INTO posts (user_id, content) VALUES (%s, %s) RETURNING id, content, created_at",
-            (user.id, data.content),
+            "INSERT INTO posts (user_id, content, is_anonymous) VALUES (%s, %s, %s) "
+            "RETURNING id, user_id, content, created_at, is_anonymous",
+            (user.id, data.content, data.is_anonymous),
         ).fetchone()
-    return PostResponse(**row, author=PostAuthor(id=user.id, username=user.username))
+    return post_from_row(row | {"username": user.username}, user.id)
 
 class PostLikeResponse(BaseModel):
     likes_count: int = Field(ge=0)

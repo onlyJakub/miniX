@@ -13,6 +13,7 @@ class Element extends EventTarget {
     this.textContent = '';
     this.disabled = false;
     this.hidden = false;
+    this.checked = false;
   }
 
   setAttribute(name, value) { this.attributes.set(name, value); }
@@ -36,6 +37,7 @@ class Element extends EventTarget {
 
 const post = (id, content = `Post ${id}`) => ({
   id, content, created_at: '2026-11-13T08:00:00Z', author: { id: 1, username: 'tester' },
+  is_anonymous: false, is_owner: true,
   likes_count: 0, liked_by_me: false,
 });
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -172,4 +174,80 @@ test('clearing the session prevents a delayed ranking from restoring private pos
   await settle();
   assert.equal(elements.get('#post-list').children.length, 0);
   assert.equal(elements.get('#post-composer').hidden, true);
+});
+
+test('anonymous cards hide author and use is_owner for deletion in both tabs', async (t) => {
+  const { elements, requests } = mount(t);
+  const own = { ...post(1), is_anonymous: true, author: null };
+  const other = { ...own, id: 2, is_owner: false };
+  requests[0].resolve([own, other]);
+  await settle();
+  const cards = elements.get('#post-list').children;
+  assert.equal(cards[0].children[0].children[0].textContent, 'Anonim');
+  assert.equal(cards[1].children[0].children[0].textContent, 'Anonim');
+  assert.equal(cards[0].querySelectorAll('button').length, 2);
+  assert.equal(cards[1].querySelectorAll('button').length, 1);
+  assert.deepEqual(cards[0].dataset, { postId: '1' });
+  elements.get('#trending-tab').click();
+  requests[1].resolve([other]);
+  await settle();
+  const ranked = elements.get('#post-list').children[0];
+  assert.equal(ranked.children[0].children[0].textContent, '🔥 1. Anonim');
+  assert.equal(ranked.querySelectorAll('button').length, 1);
+});
+
+test('normal cards also use server ownership instead of comparing author ids', async (t) => {
+  const { elements, requests } = mount(t);
+  requests[0].resolve([{ ...post(1), is_owner: false }]);
+  await settle();
+  assert.equal(elements.get('#post-list').children[0].querySelectorAll('button').length, 1);
+});
+
+test('successful anonymous publication sends the flag and resets the checkbox', async (t) => {
+  const { elements, requests } = mount(t);
+  requests[0].resolve([]);
+  await settle();
+  elements.get('#post-content').value = 'Anonimowa opinia';
+  elements.get('#post-anonymous').checked = true;
+  elements.get('#post-form').dispatchEvent(new Event('submit', { cancelable: true }));
+  assert.deepEqual(JSON.parse(requests[1].options.body), { content: 'Anonimowa opinia', is_anonymous: true });
+  assert.equal(elements.get('#post-anonymous').disabled, true);
+  requests[1].resolve({ ...post(1), is_anonymous: true, author: null }, 201);
+  await settle();
+  requests[2].resolve([]);
+  await settle();
+  assert.equal(elements.get('#post-content').value, '');
+  assert.equal(elements.get('#post-anonymous').checked, false);
+  assert.equal(elements.get('#post-anonymous').disabled, false);
+});
+
+test('unchecked publication explicitly sends false', async (t) => {
+  const { elements, requests } = mount(t);
+  requests[0].resolve([]);
+  await settle();
+  elements.get('#post-content').value = 'Zwykły wpis';
+  elements.get('#post-form').dispatchEvent(new Event('submit', { cancelable: true }));
+  assert.deepEqual(JSON.parse(requests[1].options.body), { content: 'Zwykły wpis', is_anonymous: false });
+  requests[1].resolve(post(1), 201);
+  await settle();
+  requests[2].resolve([]);
+  await settle();
+});
+
+test('publication errors preserve content and anonymous choice and session cleanup clears them', async (t) => {
+  const { elements, requests, ui } = mount(t);
+  requests[0].resolve([]);
+  await settle();
+  elements.get('#post-content').value = 'Niewysłany szkic';
+  elements.get('#post-anonymous').checked = true;
+  elements.get('#post-form').dispatchEvent(new Event('submit', { cancelable: true }));
+  requests[1].resolve({ message: 'Spróbuj ponownie' }, 503);
+  await settle();
+  assert.equal(elements.get('#post-content').value, 'Niewysłany szkic');
+  assert.equal(elements.get('#post-anonymous').checked, true);
+  assert.equal(elements.get('#post-anonymous').disabled, false);
+  assert.equal(elements.get('#post-action-message').textContent, 'Spróbuj ponownie');
+  ui.clear();
+  assert.equal(elements.get('#post-content').value, '');
+  assert.equal(elements.get('#post-anonymous').checked, false);
 });

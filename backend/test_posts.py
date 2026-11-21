@@ -26,7 +26,9 @@ class PostsTests(DatabaseTestCase):
 
     def test_create_persists_content_and_session_author(self):
         user, post = self.own_post()
-        self.assertEqual(set(post), {"id", "content", "created_at", "author", "likes_count", "liked_by_me"})
+        self.assertEqual(set(post), {"id", "content", "created_at", "is_anonymous", "author", "is_owner", "likes_count", "liked_by_me"})
+        self.assertFalse(post["is_anonymous"])
+        self.assertTrue(post["is_owner"])
         self.assertEqual(post["author"], {"id": user["id"], "username": user["username"]})
         self.assertEqual(post["likes_count"], 0)
         self.assertFalse(post["liked_by_me"])
