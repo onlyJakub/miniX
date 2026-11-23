@@ -1,5 +1,4 @@
 import './style.css';
-import { checkHealth } from './api.js';
 import { getCurrentUser, logout, setupAuthForm } from './auth.js';
 import { setupPosts } from './posts.js';
 
@@ -85,21 +84,6 @@ document.querySelector('#logout')?.addEventListener('click', async (event) => {
     document.querySelector('#logout-message').textContent = error.message;
   } finally {
     button.disabled = false;
-  }
-});
-
-const healthButton = document.querySelector('#check-health');
-healthButton?.addEventListener('click', async () => {
-  const message = document.querySelector('#health-status');
-  healthButton.disabled = true;
-  message.textContent = 'Sprawdzanie połączenia…';
-  try {
-    const result = await checkHealth();
-    message.textContent = result.message;
-  } catch (error) {
-    message.textContent = error.message;
-  } finally {
-    healthButton.disabled = false;
   }
 });
 

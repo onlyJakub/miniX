@@ -183,8 +183,8 @@ test('anonymous cards hide author and use is_owner for deletion in both tabs', a
   requests[0].resolve([own, other]);
   await settle();
   const cards = elements.get('#post-list').children;
-  assert.equal(cards[0].children[0].children[0].textContent, 'Anonim');
-  assert.equal(cards[1].children[0].children[0].textContent, 'Anonim');
+  assert.equal(cards[0].children[0].children[0].textContent, 'Gall Anonim');
+  assert.equal(cards[1].children[0].children[0].textContent, 'Gall Anonim');
   assert.equal(cards[0].querySelectorAll('button').length, 2);
   assert.equal(cards[1].querySelectorAll('button').length, 1);
   assert.deepEqual(cards[0].dataset, { postId: '1' });
@@ -192,7 +192,7 @@ test('anonymous cards hide author and use is_owner for deletion in both tabs', a
   requests[1].resolve([other]);
   await settle();
   const ranked = elements.get('#post-list').children[0];
-  assert.equal(ranked.children[0].children[0].textContent, '🔥 1. Anonim');
+  assert.equal(ranked.children[0].children[0].textContent, '🔥 1. Gall Anonim');
   assert.equal(ranked.querySelectorAll('button').length, 1);
 });
 

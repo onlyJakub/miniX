@@ -1,7 +1,15 @@
 from datetime import timezone
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_serializer, field_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+)
+
 from .auth import UserResponse, get_current_user, require_trusted_origin
 from .database import get_connection
 router = APIRouter(prefix="/api/posts", tags=["Posty"])
@@ -45,11 +53,16 @@ class PostResponse(BaseModel):
 
 def post_from_row(row, current_user_id: int) -> PostResponse:
     return PostResponse(
-        id=row["id"], content=row["content"], created_at=row["created_at"],
+        id=row["id"],
+        content=row["content"],
+        created_at=row["created_at"],
         is_anonymous=row["is_anonymous"],
-        author=None if row["is_anonymous"] else PostAuthor(id=row["user_id"], username=row["username"]),
+        author=None
+        if row["is_anonymous"]
+        else PostAuthor(id=row["user_id"], username=row["username"]),
         is_owner=row["user_id"] == current_user_id,
-        likes_count=row.get("likes_count", 0), liked_by_me=row.get("liked_by_me", False),
+        likes_count=row.get("likes_count", 0),
+        liked_by_me=row.get("liked_by_me", False),
     )
 
 @router.get("", response_model=list[PostResponse])
@@ -94,7 +107,12 @@ def trending_posts(user: CurrentUser) -> list[PostResponse]:
         ).fetchall()
     return [post_from_row(row, user.id) for row in rows]
 
-@router.post("", status_code=201, response_model=PostResponse, dependencies=[Depends(require_trusted_origin)])
+@router.post(
+    "",
+    status_code=201,
+    response_model=PostResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
 def create_post(data: PostInput, user: CurrentUser) -> PostResponse:
     with get_connection() as connection:
         row = connection.execute(
@@ -110,7 +128,9 @@ class PostLikeResponse(BaseModel):
 
 def set_post_like(post_id: int, user_id: int, liked: bool) -> PostLikeResponse:
     with get_connection() as connection:
-        post = connection.execute("SELECT id FROM posts WHERE id = %s FOR UPDATE", (post_id,)).fetchone()
+        post = connection.execute(
+            "SELECT id FROM posts WHERE id = %s FOR UPDATE", (post_id,)
+        ).fetchone()
         if post is None:
             raise HTTPException(404, "Post nie istnieje.")
         if liked:
@@ -120,22 +140,37 @@ def set_post_like(post_id: int, user_id: int, liked: bool) -> PostLikeResponse:
                 (user_id, post_id),
             )
         else:
-            connection.execute("DELETE FROM likes WHERE user_id = %s AND post_id = %s", (user_id, post_id))
+            connection.execute(
+                "DELETE FROM likes WHERE user_id = %s AND post_id = %s",
+                (user_id, post_id),
+            )
         count = connection.execute(
             "SELECT COUNT(*) AS likes_count FROM likes WHERE post_id = %s", (post_id,)
         ).fetchone()["likes_count"]
     return PostLikeResponse(likes_count=count, liked_by_me=liked)
 
-@router.post("/{post_id}/like", response_model=PostLikeResponse, dependencies=[Depends(require_trusted_origin)])
+@router.post(
+    "/{post_id}/like",
+    response_model=PostLikeResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
 def like_post(post_id: PostId, user: CurrentUser) -> PostLikeResponse:
     return set_post_like(post_id, user.id, True)
 
-
-@router.delete("/{post_id}/like", response_model=PostLikeResponse, dependencies=[Depends(require_trusted_origin)])
+@router.delete(
+    "/{post_id}/like",
+    response_model=PostLikeResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
 def unlike_post(post_id: PostId, user: CurrentUser) -> PostLikeResponse:
     return set_post_like(post_id, user.id, False)
 
-@router.delete("/{post_id}", status_code=204, response_class=Response, dependencies=[Depends(require_trusted_origin)])
+@router.delete(
+    "/{post_id}",
+    status_code=204,
+    response_class=Response,
+    dependencies=[Depends(require_trusted_origin)],
+)
 def delete_post(post_id: PostId, user: CurrentUser) -> Response:
     with get_connection() as connection:
         post = connection.execute(
@@ -145,5 +180,7 @@ def delete_post(post_id: PostId, user: CurrentUser) -> Response:
             raise HTTPException(404, "Post nie istnieje.")
         if post["user_id"] != user.id:
             raise HTTPException(403, "Możesz usuwać tylko własne posty.")
-        connection.execute("DELETE FROM posts WHERE id = %s AND user_id = %s", (post_id, user.id))
+        connection.execute(
+            "DELETE FROM posts WHERE id = %s AND user_id = %s", (post_id, user.id)
+        )
     return Response(status_code=204)

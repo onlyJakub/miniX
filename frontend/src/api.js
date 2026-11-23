@@ -38,7 +38,3 @@ export async function apiRequest(path, { method = 'GET', body } = {}) {
 
   return data;
 }
-
-export function checkHealth() {
-  return apiRequest('/health');
-}

@@ -36,7 +36,9 @@ class RegisterInput(BaseModel):
     def validate_password(cls, value):
         password = value.get_secret_value()
         if not 8 <= len(password) <= 128 or not password.strip():
-            raise ValueError("Hasło musi zawierać od 8 do 128 znaków i nie może być samymi białymi znakami.")
+            raise ValueError(
+                "Hasło musi zawierać od 8 do 128 znaków i nie może być samymi białymi znakami."
+            )
         return value
 
 class LoginInput(BaseModel):
@@ -77,7 +79,11 @@ mutation_dependencies = [Depends(require_trusted_origin)]
 def create_token(user_id: int, settings: AuthSettings) -> str:
     now = datetime.now(timezone.utc)
     return jwt.encode(
-        {"sub": str(user_id), "iat": now, "exp": now + timedelta(seconds=settings.lifetime_seconds)},
+        {
+            "sub": str(user_id),
+            "iat": now,
+            "exp": now + timedelta(seconds=settings.lifetime_seconds),
+        },
         settings.jwt_secret,
         algorithm="HS256",
     )
@@ -92,11 +98,17 @@ def get_current_user(
 
     try:
         claims = jwt.decode(
-            token, settings.jwt_secret, algorithms=["HS256"],
+            token,
+            settings.jwt_secret,
+            algorithms=["HS256"],
             options={"require": ["sub", "iat", "exp"]},
         )
         subject = claims["sub"]
-        if not isinstance(subject, str) or not subject.isascii() or not subject.isdecimal():
+        if (
+            not isinstance(subject, str)
+            or not subject.isascii()
+            or not subject.isdecimal()
+        ):
             raise unauthorized
         user_id = int(subject)
         if not 1 <= user_id <= 2147483647:
@@ -112,7 +124,12 @@ def get_current_user(
         raise unauthorized
     return UserResponse(**user)
 
-@router.post("/register", status_code=201, response_model=MessageResponse, dependencies=mutation_dependencies)
+@router.post(
+    "/register",
+    status_code=201,
+    response_model=MessageResponse,
+    dependencies=mutation_dependencies,
+)
 def register(data: RegisterInput) -> MessageResponse:
     password_hash = password_hasher.hash(data.password.get_secret_value())
     try:
@@ -134,7 +151,8 @@ def register(data: RegisterInput) -> MessageResponse:
 
 @router.post("/login", response_model=UserResponse, dependencies=mutation_dependencies)
 def login(
-    data: LoginInput, response: Response,
+    data: LoginInput,
+    response: Response,
     settings: Annotated[AuthSettings, Depends(get_auth_settings)],
 ) -> UserResponse:
     with get_connection() as connection:
@@ -161,17 +179,28 @@ def login(
             )
 
     response.set_cookie(
-        COOKIE_NAME, create_token(user["id"], settings),
-        max_age=settings.lifetime_seconds, path=COOKIE_PATH,
-        httponly=True, secure=settings.cookie_secure, samesite="lax",
+        COOKIE_NAME,
+        create_token(user["id"], settings),
+        max_age=settings.lifetime_seconds,
+        path=COOKIE_PATH,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
     )
     return UserResponse(id=user["id"], username=user["username"], email=user["email"])
 
-@router.post("/logout", response_model=MessageResponse, dependencies=mutation_dependencies)
-def logout(response: Response, settings: Annotated[AuthSettings, Depends(get_auth_settings)]) -> MessageResponse:
+@router.post(
+    "/logout", response_model=MessageResponse, dependencies=mutation_dependencies
+)
+def logout(
+    response: Response, settings: Annotated[AuthSettings, Depends(get_auth_settings)]
+) -> MessageResponse:
     response.delete_cookie(
-        COOKIE_NAME, path=COOKIE_PATH,
-        httponly=True, secure=settings.cookie_secure, samesite="lax",
+        COOKIE_NAME,
+        path=COOKIE_PATH,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
     )
     return MessageResponse(message="Wylogowano pomyślnie.")
 

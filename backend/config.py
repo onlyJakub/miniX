@@ -1,4 +1,5 @@
 """Ustawienia uwierzytelniania"""
+
 import os
 from dataclasses import dataclass
 from functools import lru_cache
@@ -27,16 +28,30 @@ def get_auth_settings() -> AuthSettings:
         raise RuntimeError("COOKIE_SECURE musi mieć wartość true lub false.")
 
     origins = tuple(
-        value.strip() for value in os.getenv(
-            "AUTH_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4173,http://localhost:4173,http://127.0.0.1:8000"
-        ).split(",") if value.strip()
+        value.strip()
+        for value in os.getenv(
+            "AUTH_ORIGINS",
+            "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4173,http://localhost:4173,http://127.0.0.1:8000",
+        ).split(",")
+        if value.strip()
     )
     if not origins:
-        raise RuntimeError("AUTH_ORIGINS musi zawierać przynajmniej jeden adres aplikacji.")
+        raise RuntimeError(
+            "AUTH_ORIGINS musi zawierać przynajmniej jeden adres aplikacji."
+        )
     for origin in origins:
         parsed = urlsplit(origin)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.path or parsed.query or parsed.fragment or parsed.username:
-            raise RuntimeError("AUTH_ORIGINS musi zawierać pełne originy bez ścieżek i końcowego ukośnika.")
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+            or parsed.username
+        ):
+            raise RuntimeError(
+                "AUTH_ORIGINS musi zawierać pełne originy bez ścieżek i końcowego ukośnika."
+            )
 
     try:
         minutes = int(os.getenv("JWT_EXPIRE_MINUTES", "60"))

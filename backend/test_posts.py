@@ -7,7 +7,7 @@ import jwt
 import psycopg
 from backend.auth import COOKIE_NAME, COOKIE_PATH
 from backend.config import get_auth_settings
-from backend.test_support import DatabaseTestCase, ORIGIN
+from backend.test_support import ORIGIN, DatabaseTestCase
 
 class PostsTests(DatabaseTestCase):
     def setUp(self):
@@ -26,16 +26,32 @@ class PostsTests(DatabaseTestCase):
 
     def test_create_persists_content_and_session_author(self):
         user, post = self.own_post()
-        self.assertEqual(set(post), {"id", "content", "created_at", "is_anonymous", "author", "is_owner", "likes_count", "liked_by_me"})
+        self.assertEqual(
+            set(post),
+            {
+                "id",
+                "content",
+                "created_at",
+                "is_anonymous",
+                "author",
+                "is_owner",
+                "likes_count",
+                "liked_by_me",
+            },
+        )
         self.assertFalse(post["is_anonymous"])
         self.assertTrue(post["is_owner"])
-        self.assertEqual(post["author"], {"id": user["id"], "username": user["username"]})
+        self.assertEqual(
+            post["author"], {"id": user["id"], "username": user["username"]}
+        )
         self.assertEqual(post["likes_count"], 0)
         self.assertFalse(post["liked_by_me"])
         self.assertTrue(post["created_at"].endswith("Z"))
         self.assertIsNotNone(datetime.fromisoformat(post["created_at"]).tzinfo)
         with self.connect() as connection:
-            stored = connection.execute("SELECT user_id, content FROM posts WHERE id = %s", (post["id"],)).fetchone()
+            stored = connection.execute(
+                "SELECT user_id, content FROM posts WHERE id = %s", (post["id"],)
+            ).fetchone()
         self.assertEqual(stored, {"user_id": user["id"], "content": "Pierwszy post"})
 
     def test_guest_cannot_publish(self):
@@ -50,7 +66,8 @@ class PostsTests(DatabaseTestCase):
                 self.assertEqual(response.json()["errors"][0]["field"], "content")
                 self.assertNotIn('"input"', response.text)
         malformed_unicode = self.client.post(
-            "/api/posts", content=json.dumps({"content": "\ud800"}, ensure_ascii=True),
+            "/api/posts",
+            content=json.dumps({"content": "\ud800"}, ensure_ascii=True),
             headers={"Content-Type": "application/json"},
         )
         self.assertEqual(malformed_unicode.status_code, 422)
@@ -78,8 +95,14 @@ class PostsTests(DatabaseTestCase):
 
     def test_client_cannot_choose_author_or_date(self):
         self.create_and_login()
-        for field, value in (("user_id", 999), ("author", {"id": 999}), ("created_at", "2020-01-01T00:00:00Z")):
-            response = self.client.post("/api/posts", json={"content": "Próba", field: value})
+        for field, value in (
+            ("user_id", 999),
+            ("author", {"id": 999}),
+            ("created_at", "2020-01-01T00:00:00Z"),
+        ):
+            response = self.client.post(
+                "/api/posts", json={"content": "Próba", field: value}
+            )
             self.assertEqual(response.status_code, 422)
         self.assertEqual(self.client.get("/api/posts").json(), [])
 
@@ -104,17 +127,24 @@ class PostsTests(DatabaseTestCase):
         ids = []
         with self.connect() as connection:
             for date in (now, now - timedelta(days=1), now, now - timedelta(days=2)):
-                ids.append(connection.execute(
-                    "INSERT INTO posts (user_id, content, created_at) VALUES (%s, %s, %s) RETURNING id",
-                    (user["id"], "Wpis", date),
-                ).fetchone()["id"])
+                ids.append(
+                    connection.execute(
+                        "INSERT INTO posts (user_id, content, created_at) VALUES (%s, %s, %s) RETURNING id",
+                        (user["id"], "Wpis", date),
+                    ).fetchone()["id"]
+                )
         result = self.client.get("/api/posts").json()
-        self.assertEqual([post["id"] for post in result], [ids[2], ids[0], ids[1], ids[3]])
+        self.assertEqual(
+            [post["id"] for post in result], [ids[2], ids[0], ids[1], ids[3]]
+        )
 
     def test_default_and_custom_pagination(self):
         user = self.create_and_login().json()
         with self.connect() as connection:
-            connection.cursor().executemany("INSERT INTO posts (user_id, content) VALUES (%s, %s)", [(user["id"], f"Wpis {index}") for index in range(55)])
+            connection.cursor().executemany(
+                "INSERT INTO posts (user_id, content) VALUES (%s, %s)",
+                [(user["id"], f"Wpis {index}") for index in range(55)],
+            )
         default = self.client.get("/api/posts").json()
         first = self.client.get("/api/posts?limit=50&offset=0").json()
         second = self.client.get("/api/posts?limit=10&offset=50").json()
@@ -123,41 +153,75 @@ class PostsTests(DatabaseTestCase):
         self.assertEqual(default, first[:20])
         self.assertEqual(len(first), 50)
         self.assertEqual(len(second), 5)
-        self.assertTrue(set(post["id"] for post in first).isdisjoint(post["id"] for post in second))
+        self.assertTrue(
+            set(post["id"] for post in first).isdisjoint(post["id"] for post in second)
+        )
         self.assertEqual(middle, first[7:14])
         self.assertEqual(self.client.get("/api/posts?offset=100").json(), [])
 
     def test_invalid_pagination(self):
         self.create_and_login()
-        for query in ("limit=0", "limit=51", "limit=-1", "limit=abc", "offset=-1", "offset=1.5", "offset=" + "9" * 30):
+        for query in (
+            "limit=0",
+            "limit=51",
+            "limit=-1",
+            "limit=abc",
+            "offset=-1",
+            "offset=1.5",
+            "offset=" + "9" * 30,
+        ):
             response = self.client.get("/api/posts?" + query)
             self.assertEqual(response.status_code, 422)
             self.assertIn(response.json()["errors"][0]["field"], ("limit", "offset"))
 
     def test_author_deletes_own_post_with_empty_204(self):
         _, post = self.own_post()
-        response = self.client.delete(f'/api/posts/{post["id"]}')
+        response = self.client.delete(f"/api/posts/{post['id']}")
         self.assertEqual(response.status_code, 204)
         self.assertEqual(response.content, b"")
         self.assertEqual(self.client.get("/api/posts").json(), [])
         with self.connect() as connection:
-            self.assertIsNone(connection.execute("SELECT id FROM posts WHERE id = %s", (post["id"],)).fetchone())
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT id FROM posts WHERE id = %s", (post["id"],)
+                ).fetchone()
+            )
 
     def test_other_user_cannot_delete_post(self):
         _, post = self.own_post()
-        other = {"username": "other_" + uuid4().hex[:12], "email": uuid4().hex + "@example.com", "password": "Other_password_123!"}
-        self.assertEqual(self.client.post("/api/auth/register", json=other).status_code, 201)
-        self.assertEqual(self.client.post("/api/auth/login", json={"identifier": other["username"], "password": other["password"]}).status_code, 200)
-        self.assertEqual(self.client.delete(f'/api/posts/{post["id"]}').status_code, 403)
+        other = {
+            "username": "other_" + uuid4().hex[:12],
+            "email": uuid4().hex + "@example.com",
+            "password": "Other_password_123!",
+        }
+        self.assertEqual(
+            self.client.post("/api/auth/register", json=other).status_code, 201
+        )
+        self.assertEqual(
+            self.client.post(
+                "/api/auth/login",
+                json={"identifier": other["username"], "password": other["password"]},
+            ).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.delete(f"/api/posts/{post['id']}").status_code, 403
+        )
         self.assertEqual(len(self.client.get("/api/posts").json()), 1)
 
     def test_guest_cannot_delete_post(self):
         _, post = self.own_post()
         self.client.cookies.clear()
-        self.assertEqual(self.client.delete(f'/api/posts/{post["id"]}').status_code, 401)
+        self.assertEqual(
+            self.client.delete(f"/api/posts/{post['id']}").status_code, 401
+        )
         self.assertEqual(self.client.get("/api/posts").status_code, 401)
         with self.connect() as connection:
-            self.assertIsNotNone(connection.execute("SELECT id FROM posts WHERE id = %s", (post["id"],)).fetchone())
+            self.assertIsNotNone(
+                connection.execute(
+                    "SELECT id FROM posts WHERE id = %s", (post["id"],)
+                ).fetchone()
+            )
 
     def test_missing_post_returns_404_for_authenticated_user(self):
         self.create_and_login()
@@ -166,7 +230,9 @@ class PostsTests(DatabaseTestCase):
     def test_invalid_post_id(self):
         self.create_and_login()
         for post_id in ("0", "-1", "abc", "2147483648"):
-            self.assertEqual(self.client.delete("/api/posts/" + post_id).status_code, 422)
+            self.assertEqual(
+                self.client.delete("/api/posts/" + post_id).status_code, 422
+            )
 
     def test_special_characters_multiline_html_and_sql_are_plain_text(self):
         text = 'Zażółć gęślą jaźń 😀\n<script>alert("xss")</script>\n<img src=x onerror=alert(1)>\n\' ; DROP TABLE users; -- & < >'
@@ -177,9 +243,17 @@ class PostsTests(DatabaseTestCase):
 
     def test_csrf_protects_create_and_delete(self):
         _, post = self.own_post()
-        for method, path, body in (("POST", "/api/posts", {"content": "Próba CSRF"}), ("DELETE", f'/api/posts/{post["id"]}', None)):
+        for method, path, body in (
+            ("POST", "/api/posts", {"content": "Próba CSRF"}),
+            ("DELETE", f"/api/posts/{post['id']}", None),
+        ):
             for origin in ("https://evil.example", "null", ORIGIN + ".evil.example"):
-                self.assertEqual(self.client.request(method, path, json=body, headers={"Origin": origin}).status_code, 403)
+                self.assertEqual(
+                    self.client.request(
+                        method, path, json=body, headers={"Origin": origin}
+                    ).status_code,
+                    403,
+                )
             request = self.client.build_request(method, path, json=body)
             del request.headers["origin"]
             self.assertEqual(self.client.send(request).status_code, 403)
@@ -188,11 +262,21 @@ class PostsTests(DatabaseTestCase):
     def test_expired_session_cannot_read_or_mutate(self):
         user, post = self.own_post()
         now = datetime.now(timezone.utc)
-        token = jwt.encode({"sub": str(user["id"]), "iat": now - timedelta(hours=2), "exp": now - timedelta(hours=1)}, get_auth_settings().jwt_secret, algorithm="HS256")
+        token = jwt.encode(
+            {
+                "sub": str(user["id"]),
+                "iat": now - timedelta(hours=2),
+                "exp": now - timedelta(hours=1),
+            },
+            get_auth_settings().jwt_secret,
+            algorithm="HS256",
+        )
         self.client.cookies.clear()
         self.client.cookies.set(COOKIE_NAME, token, path=COOKIE_PATH)
         self.assertEqual(self.publish().status_code, 401)
-        self.assertEqual(self.client.delete(f'/api/posts/{post["id"]}').status_code, 401)
+        self.assertEqual(
+            self.client.delete(f"/api/posts/{post['id']}").status_code, 401
+        )
         self.assertEqual(self.client.get("/api/posts").status_code, 401)
 
     def test_guest_cannot_read_feed(self):
@@ -202,7 +286,11 @@ class PostsTests(DatabaseTestCase):
 
     def test_invalid_or_forged_token_cannot_read_feed(self):
         now = datetime.now(timezone.utc)
-        forged = jwt.encode({"sub": "1", "iat": now, "exp": now + timedelta(hours=1)}, "wrong-signing-key-" * 4, algorithm="HS256")
+        forged = jwt.encode(
+            {"sub": "1", "iat": now, "exp": now + timedelta(hours=1)},
+            "wrong-signing-key-" * 4,
+            algorithm="HS256",
+        )
         for token in ("invalid.jwt.token", forged):
             self.client.cookies.clear()
             self.client.cookies.set(COOKIE_NAME, token, path=COOKIE_PATH)
@@ -210,25 +298,49 @@ class PostsTests(DatabaseTestCase):
 
     def test_database_enforces_content_and_foreign_key_constraints(self):
         user = self.create_and_login().json()
-        for content, error_type in (("", psycopg.errors.CheckViolation), (" \t\n", psycopg.errors.CheckViolation), ("x" * 281, psycopg.errors.StringDataRightTruncation)):
+        for content, error_type in (
+            ("", psycopg.errors.CheckViolation),
+            (" \t\n", psycopg.errors.CheckViolation),
+            ("x" * 281, psycopg.errors.StringDataRightTruncation),
+        ):
             with self.assertRaises(error_type):
                 with self.connect() as connection:
-                    connection.execute("INSERT INTO posts (user_id, content) VALUES (%s, %s)", (user["id"], content))
+                    connection.execute(
+                        "INSERT INTO posts (user_id, content) VALUES (%s, %s)",
+                        (user["id"], content),
+                    )
         with self.assertRaises(psycopg.errors.ForeignKeyViolation):
             with self.connect() as connection:
-                connection.execute("INSERT INTO posts (user_id, content) VALUES (%s, %s)", (2147483647, "Brak autora"))
+                connection.execute(
+                    "INSERT INTO posts (user_id, content) VALUES (%s, %s)",
+                    (2147483647, "Brak autora"),
+                )
 
     def test_existing_likes_foreign_key_cascades_when_post_deleted(self):
         user, post = self.own_post()
         with self.connect() as connection:
-            connection.execute("INSERT INTO likes (user_id, post_id) VALUES (%s, %s)", (user["id"], post["id"]))
-        self.assertEqual(self.client.delete(f'/api/posts/{post["id"]}').status_code, 204)
+            connection.execute(
+                "INSERT INTO likes (user_id, post_id) VALUES (%s, %s)",
+                (user["id"], post["id"]),
+            )
+        self.assertEqual(
+            self.client.delete(f"/api/posts/{post['id']}").status_code, 204
+        )
         with self.connect() as connection:
-            self.assertEqual(connection.execute("SELECT COUNT(*) AS count FROM likes WHERE post_id = %s", (post["id"],)).fetchone()["count"], 0)
+            self.assertEqual(
+                connection.execute(
+                    "SELECT COUNT(*) AS count FROM likes WHERE post_id = %s",
+                    (post["id"],),
+                ).fetchone()["count"],
+                0,
+            )
 
     def test_database_errors_do_not_leak_connection_details(self):
         self.create_and_login()
-        with patch("backend.posts.get_connection", side_effect=psycopg.OperationalError("private-database-password")):
+        with patch(
+            "backend.posts.get_connection",
+            side_effect=psycopg.OperationalError("private-database-password"),
+        ):
             response = self.client.get("/api/posts")
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("private-database-password", response.text)

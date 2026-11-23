@@ -1,15 +1,15 @@
-from typing import Literal
 from contextlib import asynccontextmanager
+from typing import Literal
 import psycopg
 from fastapi import FastAPI, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from .database import DatabaseNotConfiguredError, get_connection
 from .auth import router as auth_router
-from .posts import router as posts_router
 from .config import get_auth_settings
+from .database import DatabaseNotConfiguredError, get_connection
+from .posts import router as posts_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="MiniX API",
-    version="0.3.0",
+    version="0.5.0-beta",
     lifespan=lifespan,
 )
 app.include_router(auth_router)
@@ -33,7 +33,11 @@ async def no_cache_auth(request: Request, call_next):
 
 @app.exception_handler(StarletteHTTPException)
 async def http_error(request: Request, error: StarletteHTTPException):
-    return JSONResponse({"message": str(error.detail)}, status_code=error.status_code, headers=error.headers)
+    return JSONResponse(
+        {"message": str(error.detail)},
+        status_code=error.status_code,
+        headers=error.headers,
+    )
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, error: RequestValidationError):
@@ -51,17 +55,28 @@ async def validation_error(request: Request, error: RequestValidationError):
     errors = []
     for item in error.errors():
         field = str(item["loc"][-1])
-        errors.append({"field": field if field in messages else "form", "message": messages.get(field, "Nieprawidłowe dane żądania.")})
-    return JSONResponse({"message": "Sprawdź dane formularza.", "errors": errors}, status_code=422)
+        errors.append(
+            {
+                "field": field if field in messages else "form",
+                "message": messages.get(field, "Nieprawidłowe dane żądania."),
+            }
+        )
+    return JSONResponse(
+        {"message": "Sprawdź dane formularza.", "errors": errors}, status_code=422
+    )
 
 @app.exception_handler(DatabaseNotConfiguredError)
 async def database_not_configured(request: Request, error: DatabaseNotConfiguredError):
-    return JSONResponse({"message": "Baza danych nie jest skonfigurowana."}, status_code=503)
-
+    return JSONResponse(
+        {"message": "Baza danych nie jest skonfigurowana."}, status_code=503
+    )
 
 @app.exception_handler(psycopg.Error)
 async def database_error(request: Request, error: psycopg.Error):
-    return JSONResponse({"message": "Baza danych jest niedostępna lub wymaga przygotowania schematu."}, status_code=503)
+    return JSONResponse(
+        {"message": "Baza danych jest niedostępna lub wymaga przygotowania schematu."},
+        status_code=503,
+    )
 
 class HealthResponse(BaseModel):
     status: Literal["ok", "error"]
@@ -72,7 +87,12 @@ class HealthResponse(BaseModel):
     "/api/health",
     response_model=HealthResponse,
     tags=["Diagnostyka"],
-    responses={503: {"model": HealthResponse, "description": "Baza danych jest niedostępna lub nieskonfigurowana."}},
+    responses={
+        503: {
+            "model": HealthResponse,
+            "description": "Baza danych jest niedostępna lub nieskonfigurowana.",
+        }
+    },
 )
 
 def health(response: Response) -> HealthResponse:
