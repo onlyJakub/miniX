@@ -35,5 +35,5 @@
   .feed-tab { @apply relative min-h-14 rounded-none bg-transparent px-2 text-sm font-semibold text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-slate-100 sm:text-base; }
   .feed-tab[aria-selected="true"] { @apply text-slate-100; }
   .feed-tab[aria-selected="true"]::after { content: ''; @apply absolute right-1/4 bottom-0 left-1/4 h-1 rounded-full bg-sky-400; }
-  #post-counter[data-kind="error"] { @apply text-rose-300; }
+  #post-counter[data-kind="error"] { @apply text-red-400; }
 }

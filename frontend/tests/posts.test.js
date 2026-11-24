@@ -203,6 +203,42 @@ test('normal cards also use server ownership instead of comparing author ids', a
   assert.equal(elements.get('#post-list').children[0].querySelectorAll('button').length, 1);
 });
 
+test('counter shows remaining Unicode code points and warns below twenty', async (t) => {
+  const { elements, requests } = mount(t);
+  requests[0].resolve([]);
+  await settle();
+  const content = elements.get('#post-content');
+  const counter = elements.get('#post-counter');
+  const publish = elements.get('#publish-post');
+  const form = elements.get('#post-form');
+  assert.equal(counter.textContent, '280');
+
+  for (const [value, remaining, disabled] of [
+    ['', 280, true],
+    [' \t\n\u0085\u2003', 280, true],
+    ['a'.repeat(200), 80, false],
+    ['ą'.repeat(260), 20, false],
+    ['ą'.repeat(260) + '😀', 19, false],
+    ['ą'.repeat(278) + '😀', 1, false],
+    ['ą'.repeat(277) + '👩‍🔬', 0, false],
+    ['ą'.repeat(278) + '👩‍🔬', -1, true],
+    ['ą'.repeat(296), -16, true],
+    ['\u0085' + 'ą'.repeat(279) + '😀\u2003', 0, false],
+  ]) {
+    content.value = value;
+    content.dispatchEvent(new Event('input'));
+    assert.equal(counter.textContent, String(remaining));
+    assert.equal(counter.dataset.kind, remaining < 20 ? 'error' : '');
+    assert.equal(publish.disabled, disabled);
+    assert.equal(content.getAttribute('aria-invalid'), String(remaining < 0));
+
+    if (disabled) {
+      form.dispatchEvent(new Event('submit', { cancelable: true }));
+      assert.equal(requests.length, 1);
+    }
+  }
+});
+
 test('successful anonymous publication sends the flag and resets the checkbox', async (t) => {
   const { elements, requests } = mount(t);
   requests[0].resolve([]);
@@ -212,6 +248,9 @@ test('successful anonymous publication sends the flag and resets the checkbox', 
   elements.get('#post-form').dispatchEvent(new Event('submit', { cancelable: true }));
   assert.deepEqual(JSON.parse(requests[1].options.body), { content: 'Anonimowa opinia', is_anonymous: true });
   assert.equal(elements.get('#post-anonymous').disabled, true);
+  assert.equal(elements.get('#publish-post').disabled, true);
+  elements.get('#post-form').dispatchEvent(new Event('submit', { cancelable: true }));
+  assert.equal(requests.length, 2);
   requests[1].resolve({ ...post(1), is_anonymous: true, author: null }, 201);
   await settle();
   requests[2].resolve([]);
@@ -219,6 +258,7 @@ test('successful anonymous publication sends the flag and resets the checkbox', 
   assert.equal(elements.get('#post-content').value, '');
   assert.equal(elements.get('#post-anonymous').checked, false);
   assert.equal(elements.get('#post-anonymous').disabled, false);
+  assert.equal(elements.get('#post-counter').textContent, '280');
 });
 
 test('unchecked publication explicitly sends false', async (t) => {

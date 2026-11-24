@@ -1,8 +1,14 @@
 import { apiRequest } from './api.js';
 
 const PAGE_SIZE = 20;
+const POST_LIMIT = 280;
 const dateFormat = new Intl.DateTimeFormat('pl-PL', { dateStyle: 'medium', timeStyle: 'short' });
 const previewSegments = new Intl.Segmenter('pl', { granularity: 'grapheme' });
+
+function countPostCharacters(text) {
+  const trimmed = text.replace(/^[\p{White_Space}\u001c-\u001f]+|[\p{White_Space}\u001c-\u001f]+$/gu, '');
+  return [...trimmed].length;
+}
 
 export function setupPosts({ user, onUnauthorized } = {}) {
   const feed = document.querySelector('#feed');
@@ -43,11 +49,17 @@ export function setupPosts({ user, onUnauthorized } = {}) {
     element.dataset.kind = kind;
   }
 
+  function updatePostCounter(length) {
+    const remaining = POST_LIMIT - length;
+    counter.textContent = String(remaining);
+    counter.dataset.kind = remaining < 20 ? 'error' : '';
+    content.setAttribute('aria-invalid', String(remaining < 0));
+  }
+
   function updateControls() {
-    const length = [...content.value.trim()].length;
-    counter.textContent = `${length}/280`;
-    counter.dataset.kind = length > 280 ? 'error' : '';
-    publishButton.disabled = busy || !currentUser || length === 0 || length > 280;
+    const length = countPostCharacters(content.value);
+    updatePostCounter(length);
+    publishButton.disabled = busy || !currentUser || length === 0 || length > POST_LIMIT;
     content.disabled = busy;
     anonymous.disabled = busy;
     previousButton.disabled = busy || offset === 0;
@@ -219,8 +231,8 @@ export function setupPosts({ user, onUnauthorized } = {}) {
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const length = [...content.value.trim()].length;
-    if (disposed || busy || !currentUser || activeTab !== 'feed' || length === 0 || length > 280) return;
+    const length = countPostCharacters(content.value);
+    if (disposed || busy || !currentUser || activeTab !== 'feed' || length === 0 || length > POST_LIMIT) return;
     mutationPending = true;
     setBusy(true);
     publishButton.textContent = 'Publikowanie…';
@@ -271,7 +283,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       posts = [];
       content.value = '';
       anonymous.checked = false;
-      counter.textContent = '0/280';
+      updatePostCounter(0);
       list.replaceChildren();
       actionMessage.textContent = '';
       feedMessage.textContent = '';

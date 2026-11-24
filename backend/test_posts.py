@@ -76,12 +76,12 @@ class PostsTests(DatabaseTestCase):
 
     def test_long_content_is_rejected(self):
         self.create_and_login()
-        for content in ("a" * 281, "😀" * 281):
+        for content in ("a" * 281, "😀" * 281, "ą" * 278 + "👩‍🔬"):
             self.assertEqual(self.publish(content).status_code, 422)
 
-    def test_exactly_280_characters_and_emoji_are_accepted(self):
+    def test_279_and_280_unicode_code_points_are_accepted(self):
         self.create_and_login()
-        for content in ("a" * 280, "😀" * 280):
+        for content in ("ą" * 278 + "😀", "ą" * 277 + "👩‍🔬", "😀" * 280):
             response = self.publish(content)
             self.assertEqual(response.status_code, 201)
             self.assertEqual(response.json()["content"], content)
@@ -92,6 +92,7 @@ class PostsTests(DatabaseTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["content"], "Pierwsza linia\nDruga linia")
         self.assertEqual(self.publish("  " + "a" * 280 + "\n").status_code, 201)
+        self.assertEqual(self.publish("\u0085" + "ą" * 279 + "😀\u2003").status_code, 201)
 
     def test_client_cannot_choose_author_or_date(self):
         self.create_and_login()
