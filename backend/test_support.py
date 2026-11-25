@@ -36,6 +36,7 @@ class DatabaseTestCase(unittest.TestCase):
                     "COOKIE_SECURE": "false",
                     "AUTH_ORIGINS": ORIGIN,
                     "JWT_EXPIRE_MINUTES": "60",
+                    "AI_MODERATION_ENABLED": "false",
                 },
             )
         )

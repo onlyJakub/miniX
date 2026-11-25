@@ -1,6 +1,7 @@
 from datetime import timezone
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
+from fastapi.responses import JSONResponse
 from pydantic import (
     AwareDatetime,
     BaseModel,
@@ -11,10 +12,17 @@ from pydantic import (
 )
 
 from .auth import UserResponse, get_current_user, require_trusted_origin
+from .config import get_moderation_settings
 from .database import get_connection
+from .moderation import ModerationError, moderate_text
+
 router = APIRouter(prefix="/api/posts", tags=["Posty"])
 CurrentUser = Annotated[UserResponse, Depends(get_current_user)]
 PostId = Annotated[int, Path(ge=1, le=2147483647)]
+MODERATION_REJECTION_MESSAGES = {
+    "review": "Ten wpis może wymagać zmian. Popraw treść i spróbuj ponownie.",
+    "unsafe": "Ten wpis może naruszać zasady społeczności i nie został opublikowany.",
+}
 
 class PostInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -113,7 +121,23 @@ def trending_posts(user: CurrentUser) -> list[PostResponse]:
     response_model=PostResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
-def create_post(data: PostInput, user: CurrentUser) -> PostResponse:
+def create_post(data: PostInput, user: CurrentUser) -> PostResponse | JSONResponse:
+    if get_moderation_settings().enabled:
+        try:
+            decision = moderate_text(data.content).decision
+        except ModerationError:
+            raise HTTPException(
+                503, "Moderacja jest chwilowo niedostępna. Spróbuj ponownie później."
+            ) from None
+        if decision != "safe":
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "message": MODERATION_REJECTION_MESSAGES[decision],
+                    "moderation_decision": decision,
+                },
+            )
+
     with get_connection() as connection:
         row = connection.execute(
             "INSERT INTO posts (user_id, content, is_anonymous) VALUES (%s, %s, %s) "

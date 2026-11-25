@@ -249,16 +249,21 @@ test('successful anonymous publication sends the flag and resets the checkbox', 
   assert.deepEqual(JSON.parse(requests[1].options.body), { content: 'Anonimowa opinia', is_anonymous: true });
   assert.equal(elements.get('#post-anonymous').disabled, true);
   assert.equal(elements.get('#publish-post').disabled, true);
+  assert.equal(elements.get('#post-form-message').textContent, 'Sprawdzanie treści...');
   elements.get('#post-form').dispatchEvent(new Event('submit', { cancelable: true }));
   assert.equal(requests.length, 2);
-  requests[1].resolve({ ...post(1), is_anonymous: true, author: null }, 201);
+  const savedPost = { ...post(1, 'Anonimowa opinia'), is_anonymous: true, author: null };
+  requests[1].resolve(savedPost, 201);
   await settle();
-  requests[2].resolve([]);
+  assert.equal(requests[2].url, '/api/posts?limit=21&offset=0');
+  requests[2].resolve([savedPost]);
   await settle();
   assert.equal(elements.get('#post-content').value, '');
   assert.equal(elements.get('#post-anonymous').checked, false);
   assert.equal(elements.get('#post-anonymous').disabled, false);
   assert.equal(elements.get('#post-counter').textContent, '280');
+  assert.equal(elements.get('#post-form-message').textContent, 'Post został opublikowany.');
+  assert.equal(elements.get('#post-list').children[0].dataset.postId, '1');
 });
 
 test('unchecked publication explicitly sends false', async (t) => {
@@ -274,20 +279,44 @@ test('unchecked publication explicitly sends false', async (t) => {
   await settle();
 });
 
-test('publication errors preserve content and anonymous choice and session cleanup clears them', async (t) => {
+test('moderation failures keep the draft and allow a corrected submission', async (t) => {
   const { elements, requests, ui } = mount(t);
   requests[0].resolve([]);
   await settle();
-  elements.get('#post-content').value = 'Niewysłany szkic';
-  elements.get('#post-anonymous').checked = true;
-  elements.get('#post-form').dispatchEvent(new Event('submit', { cancelable: true }));
-  requests[1].resolve({ message: 'Spróbuj ponownie' }, 503);
-  await settle();
-  assert.equal(elements.get('#post-content').value, 'Niewysłany szkic');
-  assert.equal(elements.get('#post-anonymous').checked, true);
-  assert.equal(elements.get('#post-anonymous').disabled, false);
-  assert.equal(elements.get('#post-action-message').textContent, 'Spróbuj ponownie');
+  const content = elements.get('#post-content');
+  const anonymous = elements.get('#post-anonymous');
+  const form = elements.get('#post-form');
+  const message = elements.get('#post-form-message');
+  anonymous.checked = true;
+
+  const failures = [
+    [422, { message: 'Ten wpis może wymagać zmian. Popraw treść i spróbuj ponownie.', moderation_decision: 'review' }],
+    [422, { message: 'Ten wpis może naruszać zasady społeczności i nie został opublikowany.', moderation_decision: 'unsafe' }],
+    [503, { message: 'Moderacja jest chwilowo niedostępna. Spróbuj ponownie później.' }],
+  ];
+  for (const [index, [status, body]] of failures.entries()) {
+    const draft = `Szkic po poprawce ${index}`;
+    content.value = draft;
+    content.dispatchEvent(new Event('input'));
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    assert.equal(message.textContent, 'Sprawdzanie treści...');
+    const request = requests[index + 1];
+    assert.equal(request.url, '/api/posts');
+    assert.deepEqual(JSON.parse(request.options.body), { content: draft, is_anonymous: true });
+    request.resolve(body, status);
+    await settle();
+    assert.equal(requests.length, index + 2);
+    assert.equal(content.value, draft);
+    assert.equal(content.disabled, false);
+    assert.equal(anonymous.checked, true);
+    assert.equal(anonymous.disabled, false);
+    assert.equal(elements.get('#publish-post').disabled, false);
+    assert.equal(message.textContent, body.message);
+    assert.equal(message.dataset.kind, 'error');
+  }
+
   ui.clear();
-  assert.equal(elements.get('#post-content').value, '');
-  assert.equal(elements.get('#post-anonymous').checked, false);
+  assert.equal(content.value, '');
+  assert.equal(anonymous.checked, false);
+  assert.equal(message.textContent, '');
 });

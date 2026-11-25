@@ -19,6 +19,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
   const actionMessage = document.querySelector('#post-action-message');
   const composer = document.querySelector('#post-composer');
   const form = document.querySelector('#post-form');
+  const formMessage = document.querySelector('#post-form-message');
   const content = document.querySelector('#post-content');
   const anonymous = document.querySelector('#post-anonymous');
   const counter = document.querySelector('#post-counter');
@@ -179,6 +180,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
     offset = 0;
     hasNext = false;
     showMessage(actionMessage, '');
+    showMessage(formMessage, '');
     await loadPage(0);
   }
 
@@ -236,18 +238,22 @@ export function setupPosts({ user, onUnauthorized } = {}) {
     mutationPending = true;
     setBusy(true);
     publishButton.textContent = 'Publikowanie…';
-    showMessage(actionMessage, 'Publikowanie posta…');
+    showMessage(formMessage, 'Sprawdzanie treści...');
     try {
-      await apiRequest('/posts', { method: 'POST', body: { content: content.value, is_anonymous: anonymous.checked } });
+      await apiRequest('/posts', {
+        method: 'POST',
+        body: { content: content.value, is_anonymous: anonymous.checked },
+        timeout: 30000,
+      });
       if (disposed) return;
       content.value = '';
       anonymous.checked = false;
-      showMessage(actionMessage, 'Post został opublikowany.', 'success');
+      showMessage(formMessage, 'Post został opublikowany.', 'success');
       await loadPage(0);
     } catch (error) {
       if (disposed) return;
       if (error.status === 401) { onUnauthorized?.(); return; }
-      showMessage(actionMessage, error.message, 'error');
+      showMessage(formMessage, error.message, 'error');
     } finally {
       mutationPending = false;
       publishButton.textContent = 'Opublikuj';
@@ -286,6 +292,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       updatePostCounter(0);
       list.replaceChildren();
       actionMessage.textContent = '';
+      formMessage.textContent = '';
       feedMessage.textContent = '';
       composer.hidden = true;
     },

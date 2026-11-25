@@ -1,4 +1,4 @@
-export async function apiRequest(path, { method = 'GET', body } = {}) {
+export async function apiRequest(path, { method = 'GET', body, timeout = 15000 } = {}) {
   let response;
 
   try {
@@ -11,7 +11,7 @@ export async function apiRequest(path, { method = 'GET', body } = {}) {
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       cache: 'no-store',
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(timeout),
     });
   } catch {
     throw new Error('Nie można połączyć się z API. Sprawdź, czy frontend i backend są uruchomione.');
