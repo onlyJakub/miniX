@@ -29,3 +29,6 @@ dist/
 .DS_Store
 Thumbs.db
 migrations/
+
+demo_posts.txt
+seed_demo.py

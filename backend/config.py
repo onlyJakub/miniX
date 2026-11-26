@@ -1,4 +1,4 @@
-"""Ustawienia uwierzytelniania"""
+"""Ustawienia uwierzytelniania i moderacji."""
 
 import os
 from dataclasses import dataclass
@@ -16,6 +16,20 @@ class AuthSettings:
     cookie_secure: bool
     allowed_origins: tuple[str, ...]
     lifetime_seconds: int
+
+@dataclass(frozen=True)
+class ModerationSettings:
+    enabled: bool
+    base_url: str
+    model: str
+
+
+def get_moderation_settings() -> ModerationSettings:
+    return ModerationSettings(
+        enabled=os.getenv("AI_MODERATION_ENABLED", "false").strip().lower() == "true",
+        base_url=os.getenv("AI_BASE_URL", "http://127.0.0.1:1234").strip().rstrip("/"),
+        model=os.getenv("AI_MODEL", "basal-omni-1.0-mini").strip(),
+    )
 
 @lru_cache
 def get_auth_settings() -> AuthSettings:

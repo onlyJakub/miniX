@@ -1,8 +1,26 @@
 import { apiRequest } from './api.js';
 
 const PAGE_SIZE = 20;
+const POST_LIMIT = 280;
+const SUCCESS_MESSAGE_DURATION = 3000;
 const dateFormat = new Intl.DateTimeFormat('pl-PL', { dateStyle: 'medium', timeStyle: 'short' });
 const previewSegments = new Intl.Segmenter('pl', { granularity: 'grapheme' });
+const heartIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-9-5.5-9-12a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-9 12-9 12Z"/></svg>';
+const deleteIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16m-10 4v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+
+function countPostCharacters(text) {
+  const trimmed = text.replace(/^[\p{White_Space}\u001c-\u001f]+|[\p{White_Space}\u001c-\u001f]+$/gu, '');
+  return [...trimmed].length;
+}
+
+function postAuthorName(post) {
+  return post.is_anonymous ? 'Gall Anonim' : `@${post.author.username}`;
+}
+
+function trendingExcerpt(content) {
+  const characters = Array.from(previewSegments.segment(content), ({ segment }) => segment);
+  return characters.length > 40 ? `${characters.slice(0, 40).join('')}…` : content;
+}
 
 export function setupPosts({ user, onUnauthorized } = {}) {
   const feed = document.querySelector('#feed');
@@ -13,6 +31,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
   const actionMessage = document.querySelector('#post-action-message');
   const composer = document.querySelector('#post-composer');
   const form = document.querySelector('#post-form');
+  const formMessage = document.querySelector('#post-form-message');
   const content = document.querySelector('#post-content');
   const anonymous = document.querySelector('#post-anonymous');
   const counter = document.querySelector('#post-counter');
@@ -22,10 +41,20 @@ export function setupPosts({ user, onUnauthorized } = {}) {
   const refreshButton = document.querySelector('#refresh-posts');
   const pageLabel = document.querySelector('#page-label');
   const pagination = document.querySelector('#feed-pagination');
+  const feedTitle = document.querySelector('#feed-title');
   const feedHeading = document.querySelector('#feed-heading');
   const forYouTab = document.querySelector('#for-you-tab');
   const trendingTab = document.querySelector('#trending-tab');
   const tabs = [forYouTab, trendingTab];
+  const homeNav = document.querySelector('#nav-home');
+  const newPost = document.querySelector('#new-post');
+  const accountAvatar = document.querySelector('#account-avatar');
+  const composerAvatar = document.querySelector('#composer-avatar');
+  const previewList = document.querySelector('#trending-preview-list');
+  const previewMessage = document.querySelector('#trending-preview-message');
+  const previewMedia = globalThis.matchMedia?.('(min-width: 75rem)');
+  const userInitial = user.username.charAt(0).toUpperCase();
+  accountAvatar.textContent = userInitial;
 
   let currentUser = user;
   let activeTab = 'feed';
@@ -35,7 +64,9 @@ export function setupPosts({ user, onUnauthorized } = {}) {
   let busy = false;
   let mutationPending = false;
   let feedRequest = 0;
+  let previewRequest = 0;
   let disposed = false;
+  let successMessageTimer;
   const events = new AbortController();
 
   function showMessage(element, text, kind = '') {
@@ -43,13 +74,30 @@ export function setupPosts({ user, onUnauthorized } = {}) {
     element.dataset.kind = kind;
   }
 
+  function showFormMessage(text, kind = '') {
+    clearTimeout(successMessageTimer);
+    successMessageTimer = undefined;
+    showMessage(formMessage, text, kind);
+    if (kind === 'success') {
+      successMessageTimer = setTimeout(() => showFormMessage(''), SUCCESS_MESSAGE_DURATION);
+    }
+  }
+
+  function updatePostCounter(length) {
+    const remaining = POST_LIMIT - length;
+    counter.textContent = String(remaining);
+    counter.dataset.kind = remaining < 20 ? 'error' : '';
+    content.setAttribute('aria-invalid', String(remaining < 0));
+  }
+
   function updateControls() {
-    const length = [...content.value.trim()].length;
-    counter.textContent = `${length}/280`;
-    counter.dataset.kind = length > 280 ? 'error' : '';
-    publishButton.disabled = busy || !currentUser || length === 0 || length > 280;
+    const length = countPostCharacters(content.value);
+    updatePostCounter(length);
+    publishButton.disabled = busy || !currentUser || length === 0 || length > POST_LIMIT;
     content.disabled = busy;
     anonymous.disabled = busy;
+    composerAvatar.textContent = anonymous.checked ? '?' : userInitial;
+    composerAvatar.className = anonymous.checked ? 'avatar avatar-anonymous' : 'avatar';
     previousButton.disabled = busy || offset === 0;
     nextButton.disabled = busy || !hasNext;
     refreshButton.disabled = busy;
@@ -57,14 +105,19 @@ export function setupPosts({ user, onUnauthorized } = {}) {
     const trending = activeTab === 'trending';
     composer.hidden = trending;
     pagination.hidden = trending;
-    feedHeading.textContent = trending ? 'Gorące Posty · ostatnie 24 godziny' : 'Najnowsze wpisy';
-    refreshButton.textContent = trending ? 'Odśwież ranking' : 'Odśwież feed';
+    feedTitle.textContent = trending ? 'Popularne' : 'Strona główna';
+    feedHeading.hidden = !trending;
+    const refreshLabel = trending ? 'Odśwież ranking' : 'Odśwież feed';
+    refreshButton.setAttribute('aria-label', refreshLabel);
+    refreshButton.title = refreshLabel;
     forYouTab.setAttribute('aria-selected', String(!trending));
     trendingTab.setAttribute('aria-selected', String(trending));
     forYouTab.tabIndex = trending ? -1 : 0;
     trendingTab.tabIndex = trending ? 0 : -1;
     feed.setAttribute('aria-labelledby', trending ? 'trending-tab' : 'for-you-tab');
-    for (const tab of tabs) tab.disabled = mutationPending;
+    homeNav.setAttribute('aria-current', String(!trending));
+    for (const button of [...tabs, homeNav]) button.disabled = mutationPending;
+    newPost.disabled = mutationPending || (busy && !trending);
     list.setAttribute('aria-busy', String(busy));
     for (const button of list.querySelectorAll('button')) button.disabled = busy;
   }
@@ -89,30 +142,32 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       article.dataset.postId = String(post.id);
 
       const header = document.createElement('header');
-      header.className = 'flex flex-wrap items-start justify-between gap-3';
+      header.className = 'post-meta';
       const author = document.createElement('h3');
-      author.className = 'min-w-0 font-semibold text-sky-200 [overflow-wrap:anywhere]';
-      const authorName = post.is_anonymous ? 'Gall Anonim' : `@${post.author.username}`;
-      author.textContent = trending ? `🔥 ${index + 1}. ${authorName}` : authorName;
+      author.className = 'post-author';
+      const authorName = postAuthorName(post);
+      author.textContent = trending ? `${index + 1}. ${authorName}` : authorName;
       const date = document.createElement('time');
-      date.className = 'text-xs leading-6 text-slate-400';
       date.dateTime = post.created_at;
       date.textContent = dateFormat.format(new Date(post.created_at));
-      header.append(author, date);
+      const avatar = document.createElement('span');
+      avatar.className = post.is_anonymous ? 'avatar avatar-anonymous' : 'avatar';
+      avatar.setAttribute('aria-hidden', 'true');
+      avatar.textContent = post.is_anonymous ? '?' : post.author.username.charAt(0).toUpperCase();
+      header.append(author, date, avatar);
 
       const text = document.createElement('p');
       text.className = 'post-text';
-      const characters = Array.from(previewSegments.segment(post.content), ({ segment }) => segment);
-      text.textContent = trending && characters.length > 40 ? `${characters.slice(0, 40).join('')}…` : post.content;
+      text.textContent = trending ? trendingExcerpt(post.content) : post.content;
       article.append(header, text);
 
       const actions = document.createElement('div');
-      actions.className = 'mt-4 flex items-center gap-4';
+      actions.className = 'post-actions';
       const likeButton = document.createElement('button');
       likeButton.type = 'button';
       likeButton.className = 'like-button';
       likeButton.disabled = busy;
-      likeButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-9-5.5-9-12a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-9 12-9 12Z"/></svg><span aria-hidden="true"></span>';
+      likeButton.innerHTML = `${heartIcon}<span aria-hidden="true"></span>`;
       updateLikeButton(likeButton, post);
       likeButton.addEventListener('click', () => toggleLike(post, likeButton));
       actions.append(likeButton);
@@ -120,8 +175,10 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       if (post.is_owner) {
         const deleteButton = document.createElement('button');
         deleteButton.type = 'button';
-        deleteButton.className = 'button-secondary text-sm';
-        deleteButton.textContent = 'Usuń post';
+        deleteButton.className = 'feed-icon-button delete-button';
+        deleteButton.setAttribute('aria-label', 'Usuń post');
+        deleteButton.title = 'Usuń post';
+        deleteButton.innerHTML = deleteIcon;
         deleteButton.disabled = busy;
         deleteButton.addEventListener('click', () => removePost(post.id, deleteButton));
         actions.append(deleteButton);
@@ -132,22 +189,66 @@ export function setupPosts({ user, onUnauthorized } = {}) {
     list.replaceChildren(fragment);
   }
 
+  function renderTrendingPreview(rankedPosts) {
+    const fragment = document.createDocumentFragment();
+    for (const post of rankedPosts.slice(0, 3)) {
+      const item = document.createElement('li');
+      const author = document.createElement('p');
+      author.className = 'preview-author';
+      author.textContent = postAuthorName(post);
+      const text = document.createElement('p');
+      text.className = 'preview-text';
+      text.textContent = trendingExcerpt(post.content);
+      const likes = document.createElement('p');
+      likes.className = 'preview-likes';
+      likes.innerHTML = heartIcon;
+      const label = document.createElement('span');
+      label.className = 'sr-only';
+      label.textContent = 'Liczba polubień: ';
+      const count = document.createElement('span');
+      count.textContent = String(post.likes_count);
+      likes.append(label, count);
+      item.append(author, text, likes);
+      fragment.append(item);
+    }
+    previewList.replaceChildren(fragment);
+    showMessage(previewMessage, rankedPosts.length ? '' : 'W ostatnich 24 godzinach nie pojawił się żaden wpis.');
+  }
+
+  async function loadTrendingPreview() {
+    if (disposed || !previewMedia?.matches) return;
+    const request = ++previewRequest;
+    if (!previewList.children.length) showMessage(previewMessage, 'Ładowanie rankingu…');
+    try {
+      const result = await apiRequest('/posts/trending');
+      if (!disposed && request === previewRequest) renderTrendingPreview(result);
+    } catch {
+      if (disposed || request !== previewRequest) return;
+      previewList.replaceChildren();
+      showMessage(previewMessage, 'Ranking jest chwilowo niedostępny.', 'error');
+    }
+  }
+
   async function loadPage(newOffset = offset) {
     if (disposed) return;
     const request = ++feedRequest;
     const trending = activeTab === 'trending';
+    if (trending) previewRequest += 1;
     setBusy(true);
     posts = [];
     list.replaceChildren();
     showMessage(feedMessage, trending ? 'Ładowanie rankingu…' : 'Ładowanie postów…');
     try {
       const path = trending ? '/posts/trending' : `/posts?limit=${PAGE_SIZE + 1}&offset=${newOffset}`;
-      const result = await apiRequest(path);
+      const loading = apiRequest(path);
+      if (!trending && newOffset === 0) loadTrendingPreview();
+      const result = await loading;
       if (disposed || request !== feedRequest) return;
       posts = trending ? result : result.slice(0, PAGE_SIZE);
       hasNext = !trending && result.length > PAGE_SIZE;
       offset = newOffset;
       renderPosts();
+      if (trending && previewMedia?.matches) renderTrendingPreview(result);
       let emptyMessage = 'Nie ma jeszcze postów. Opublikuj pierwszy wpis!';
       if (trending) emptyMessage = 'Nie ma postów z ostatnich 24 godzin.';
       else if (offset > 0) emptyMessage = 'Nie ma kolejnych postów. Wróć na poprzednią stronę.';
@@ -156,6 +257,10 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       if (disposed || request !== feedRequest) return;
       if (error.status === 401) { onUnauthorized?.(); return; }
       showMessage(feedMessage, error.message, 'error');
+      if (trending && previewMedia?.matches) {
+        previewList.replaceChildren();
+        showMessage(previewMessage, 'Ranking jest chwilowo niedostępny.', 'error');
+      }
     } finally {
       if (!disposed && request === feedRequest) setBusy(false);
     }
@@ -183,6 +288,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       updateLikeButton(button, post);
       showMessage(actionMessage, post.liked_by_me ? 'Polubiono post.' : 'Cofnięto polubienie.', 'success');
       if (activeTab === 'trending') await loadPage(0);
+      else loadTrendingPreview();
     } catch (error) {
       if (disposed) return;
       if (error.status === 401) { onUnauthorized?.(); return; }
@@ -198,7 +304,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
     if (disposed || busy || !currentUser) return;
     mutationPending = true;
     setBusy(true);
-    button.textContent = 'Usuwanie…';
+    button.setAttribute('aria-label', 'Usuwanie posta…');
     showMessage(actionMessage, 'Usuwanie posta…');
     try {
       await apiRequest(`/posts/${postId}`, { method: 'DELETE' });
@@ -212,43 +318,65 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       if (error.status === 404) await loadPage(0);
     } finally {
       mutationPending = false;
-      button.textContent = 'Usuń post';
+      button.setAttribute('aria-label', 'Usuń post');
       if (!disposed) setBusy(false);
     }
   }
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const length = [...content.value.trim()].length;
-    if (disposed || busy || !currentUser || activeTab !== 'feed' || length === 0 || length > 280) return;
+    const length = countPostCharacters(content.value);
+    if (disposed || busy || !currentUser || activeTab !== 'feed' || length === 0 || length > POST_LIMIT) return;
     mutationPending = true;
     setBusy(true);
-    publishButton.textContent = 'Publikowanie…';
-    showMessage(actionMessage, 'Publikowanie posta…');
+    showFormMessage('Sprawdzanie treści...', 'pending');
     try {
-      await apiRequest('/posts', { method: 'POST', body: { content: content.value, is_anonymous: anonymous.checked } });
+      await apiRequest('/posts', {
+        method: 'POST',
+        body: { content: content.value, is_anonymous: anonymous.checked },
+        timeout: 30000,
+      });
       if (disposed) return;
       content.value = '';
       anonymous.checked = false;
-      showMessage(actionMessage, 'Post został opublikowany.', 'success');
+      showFormMessage('Post został opublikowany.', 'success');
       await loadPage(0);
     } catch (error) {
       if (disposed) return;
       if (error.status === 401) { onUnauthorized?.(); return; }
-      showMessage(actionMessage, error.message, 'error');
+      showFormMessage(error.message, 'error');
     } finally {
       mutationPending = false;
-      publishButton.textContent = 'Opublikuj';
       if (!disposed) setBusy(false);
     }
   }, { signal: events.signal });
 
-  content.addEventListener('input', updateControls, { signal: events.signal });
+  content.addEventListener('input', () => {
+    if (formMessage.dataset.kind === 'success' || formMessage.dataset.kind === 'error') showFormMessage('');
+    updateControls();
+  }, { signal: events.signal });
+  anonymous.addEventListener('change', updateControls, { signal: events.signal });
   previousButton.addEventListener('click', () => { if (!busy) loadPage(Math.max(0, offset - PAGE_SIZE)); }, { signal: events.signal });
   nextButton.addEventListener('click', () => { if (!busy) loadPage(offset + PAGE_SIZE); }, { signal: events.signal });
   refreshButton.addEventListener('click', () => { if (!busy) loadPage(0); }, { signal: events.signal });
   forYouTab.addEventListener('click', () => switchTab('feed'), { signal: events.signal });
   trendingTab.addEventListener('click', () => switchTab('trending'), { signal: events.signal });
+  homeNav.addEventListener('click', () => {
+    globalThis.scrollTo(0, 0);
+    switchTab('feed');
+  }, { signal: events.signal });
+  newPost.addEventListener('click', async () => {
+    if (disposed || mutationPending) return;
+    if (activeTab !== 'feed') await switchTab('feed');
+    if (disposed || activeTab !== 'feed' || content.disabled) return;
+    composer.scrollIntoView({ block: 'start' });
+    content.focus({ preventScroll: true });
+  }, { signal: events.signal });
+  previewMedia?.addEventListener('change', () => {
+    if (!previewMedia.matches) previewRequest += 1;
+    else if (activeTab === 'feed') loadTrendingPreview();
+    else if (!busy) renderTrendingPreview(posts);
+  }, { signal: events.signal });
   for (const tab of tabs) {
     tab.addEventListener('keydown', (event) => {
       if (mutationPending || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -271,9 +399,14 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       posts = [];
       content.value = '';
       anonymous.checked = false;
-      counter.textContent = '0/280';
+      accountAvatar.textContent = '';
+      composerAvatar.textContent = '';
+      updatePostCounter(0);
       list.replaceChildren();
+      previewList.replaceChildren();
+      previewMessage.textContent = '';
       actionMessage.textContent = '';
+      showFormMessage('');
       feedMessage.textContent = '';
       composer.hidden = true;
     },
