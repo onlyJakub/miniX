@@ -18,7 +18,10 @@ class Element extends EventTarget {
 
   setAttribute(name, value) { this.attributes.set(name, value); }
   getAttribute(name) { return this.attributes.get(name); }
-  set innerHTML(value) { this.children = [new Element('svg'), new Element('span')]; }
+  set innerHTML(value) {
+    this.children = [new Element('svg')];
+    if (value.includes('<span')) this.children.push(new Element('span'));
+  }
   append(...children) {
     for (const child of children) {
       if (child.tagName === 'fragment') this.children.push(...child.children);
@@ -33,6 +36,8 @@ class Element extends EventTarget {
   }
   querySelector(tagName) { return this.querySelectorAll(tagName)[0]; }
   click() { if (!this.disabled) this.dispatchEvent(new Event('click')); }
+  focus() { this.focused = true; }
+  scrollIntoView(options) { this.scrollOptions = options; }
 }
 
 const post = (id, content = `Post ${id}`) => ({
@@ -42,12 +47,18 @@ const post = (id, content = `Post ${id}`) => ({
 });
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
-function mount(t) {
+function mount(t, { desktop = false } = {}) {
   const originalDocument = globalThis.document;
   const originalFetch = globalThis.fetch;
+  const originalMatchMedia = globalThis.matchMedia;
+  const originalScrollTo = globalThis.scrollTo;
   const elements = new Map();
   const requests = [];
   let unauthorized = 0;
+  const media = new EventTarget();
+  media.matches = desktop;
+  globalThis.matchMedia = () => media;
+  globalThis.scrollTo = () => {};
   globalThis.document = {
     querySelector(selector) {
       if (!elements.has(selector)) elements.set(selector, new Element());
@@ -57,15 +68,20 @@ function mount(t) {
     createDocumentFragment: () => new Element('fragment'),
   };
   globalThis.fetch = (url, options) => new Promise((resolve, reject) => {
-    requests.push({ url, options, resolve: (data, status = 200) => resolve(Response.json(data, { status })), reject });
+    requests.push({
+      url, options, reject,
+      resolve: (data, status = 200) => resolve(status === 204 ? new Response(null, { status }) : Response.json(data, { status })),
+    });
   });
-  const ui = setupPosts({ user: { id: 1 }, onUnauthorized: () => { unauthorized += 1; } });
+  const ui = setupPosts({ user: { id: 1, username: 'tester' }, onUnauthorized: () => { unauthorized += 1; } });
   t.after(() => {
     ui.clear();
     globalThis.document = originalDocument;
     globalThis.fetch = originalFetch;
+    globalThis.matchMedia = originalMatchMedia;
+    globalThis.scrollTo = originalScrollTo;
   });
-  return { elements, requests, ui, unauthorized: () => unauthorized };
+  return { elements, requests, ui, media, unauthorized: () => unauthorized };
 }
 
 test('rapid tab switches ignore delayed data and errors from previous requests', async (t) => {
@@ -111,7 +127,7 @@ test('trending truncates to forty visible characters without splitting emoji and
   requests[1].resolve([post(1, 'ą'.repeat(39) + '👩‍🔬dalsza treść'), post(2, '<b>Tekst</b>')]);
   await settle();
   const cards = elements.get('#post-list').children;
-  assert.equal(cards[0].children[0].children[0].textContent, '🔥 1. @tester');
+  assert.equal(cards[0].children[0].children[0].textContent, '1. @tester');
   assert.equal(cards[0].children[1].textContent, 'ą'.repeat(39) + '👩‍🔬…');
   assert.equal(cards[1].children[1].textContent, '<b>Tekst</b>');
   assert.equal(elements.get('#post-composer').hidden, true);
@@ -145,7 +161,7 @@ test('liking in trending sends one mutation and reloads the server ranking', asy
   await settle();
   const first = elements.get('#post-list').children[0];
   assert.equal(first.dataset.postId, '2');
-  assert.equal(first.children[0].children[0].textContent, '🔥 1. @tester');
+  assert.equal(first.children[0].children[0].textContent, '1. @tester');
   assert.equal(first.querySelectorAll('button')[0].getAttribute('aria-pressed'), 'true');
   assert.equal(elements.get('#for-you-tab').disabled, false);
 });
@@ -192,7 +208,7 @@ test('anonymous cards hide author and use is_owner for deletion in both tabs', a
   requests[1].resolve([other]);
   await settle();
   const ranked = elements.get('#post-list').children[0];
-  assert.equal(ranked.children[0].children[0].textContent, '🔥 1. Gall Anonim');
+  assert.equal(ranked.children[0].children[0].textContent, '1. Gall Anonim');
   assert.equal(ranked.querySelectorAll('button').length, 1);
 });
 
@@ -201,6 +217,103 @@ test('normal cards also use server ownership instead of comparing author ids', a
   requests[0].resolve([{ ...post(1), is_owner: false }]);
   await settle();
   assert.equal(elements.get('#post-list').children[0].querySelectorAll('button').length, 1);
+});
+
+test('desktop preview preserves server order and ignores earlier responses after opening the ranking', async (t) => {
+  const { elements, requests, ui } = mount(t, { desktop: true });
+  const preview = elements.get('#trending-preview-list');
+  requests[0].resolve([]);
+  assert.equal(requests[1].url, '/api/posts/trending');
+  elements.get('#trending-tab').click();
+  assert.equal(requests[2].url, '/api/posts/trending');
+  const anonymous = { ...post(3, '<b>Anonimowa treść</b>'), author: null, is_anonymous: true };
+  requests[2].resolve([anonymous, post(2), post(4), post(6)]);
+  await settle();
+  requests[1].resolve([post(9)]);
+  await settle();
+  assert.equal(preview.children.length, 3);
+  assert.equal(preview.children[0].children[0].textContent, 'Gall Anonim');
+  assert.deepEqual(preview.children.map((item) => item.children[1].textContent), [anonymous.content, 'Post 2', 'Post 4']);
+  ui.clear();
+  assert.equal(preview.children.length, 0);
+});
+
+test('preview loads only at desktop width and ignores a response after it is hidden', async (t) => {
+  const { elements, requests, media } = mount(t);
+  requests[0].resolve([]);
+  await settle();
+  assert.equal(requests.length, 1);
+  media.matches = true;
+  media.dispatchEvent(new Event('change'));
+  assert.equal(requests[1].url, '/api/posts/trending');
+  media.matches = false;
+  media.dispatchEvent(new Event('change'));
+  requests[1].resolve([post(1)]);
+  await settle();
+  assert.equal(elements.get('#trending-preview-list').children.length, 0);
+});
+
+test('New post returns from Popularne and focuses the existing draft', async (t) => {
+  const { elements, requests } = mount(t);
+  requests[0].resolve([]);
+  await settle();
+  const content = elements.get('#post-content');
+  content.value = 'Zachowany szkic';
+  elements.get('#trending-tab').click();
+  requests[1].resolve([]);
+  await settle();
+  assert.equal(elements.get('#trending-tab').getAttribute('aria-selected'), 'true');
+  elements.get('#new-post').click();
+  requests[2].resolve([]);
+  await settle();
+  assert.equal(elements.get('#post-composer').hidden, false);
+  assert.equal(elements.get('#nav-home').getAttribute('aria-current'), 'true');
+  assert.deepEqual(elements.get('#post-composer').scrollOptions, { block: 'start' });
+  assert.equal(content.focused, true);
+  assert.equal(content.value, 'Zachowany szkic');
+  assert.equal(requests.length, 3);
+  assert.ok(requests.every((request) => request.options.method === 'GET'));
+});
+
+test('desktop preview refreshes after a like, deletion and publication', async (t) => {
+  const { elements, requests } = mount(t, { desktop: true });
+  const preview = elements.get('#trending-preview-list');
+  const list = elements.get('#post-list');
+  requests[0].resolve([post(1)]);
+  requests[1].resolve([post(1)]);
+  await settle();
+
+  const [like, remove] = list.children[0].querySelectorAll('button');
+  like.click();
+  assert.equal(requests[2].url, '/api/posts/1/like');
+  requests[2].resolve({ likes_count: 1, liked_by_me: true });
+  await settle();
+  assert.equal(requests[3].url, '/api/posts/trending');
+  requests[3].resolve([{ ...post(1), likes_count: 1 }]);
+  await settle();
+  assert.equal(preview.children[0].children[2].children.at(-1).textContent, '1');
+
+  remove.click();
+  assert.equal(requests[4].url, '/api/posts/1');
+  assert.equal(requests[4].options.method, 'DELETE');
+  requests[4].resolve(null, 204);
+  await settle();
+  assert.equal(requests[6].url, '/api/posts/trending');
+  requests[5].resolve([]);
+  requests[6].resolve([]);
+  await settle();
+  assert.equal(preview.children.length, 0);
+
+  const newPost = post(2, 'Nowy wpis');
+  elements.get('#post-content').value = newPost.content;
+  elements.get('#post-form').dispatchEvent(new Event('submit', { cancelable: true }));
+  requests[7].resolve(newPost, 201);
+  await settle();
+  assert.equal(requests[9].url, '/api/posts/trending');
+  requests[8].resolve([newPost]);
+  requests[9].resolve([newPost]);
+  await settle();
+  assert.equal(preview.children[0].children[1].textContent, newPost.content);
 });
 
 test('counter shows remaining Unicode code points and warns below twenty', async (t) => {
@@ -240,6 +353,7 @@ test('counter shows remaining Unicode code points and warns below twenty', async
 });
 
 test('successful anonymous publication sends the flag and resets the checkbox', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const { elements, requests } = mount(t);
   requests[0].resolve([]);
   await settle();
@@ -264,6 +378,10 @@ test('successful anonymous publication sends the flag and resets the checkbox', 
   assert.equal(elements.get('#post-counter').textContent, '280');
   assert.equal(elements.get('#post-form-message').textContent, 'Post został opublikowany.');
   assert.equal(elements.get('#post-list').children[0].dataset.postId, '1');
+  t.mock.timers.tick(2999);
+  assert.equal(elements.get('#post-form-message').textContent, 'Post został opublikowany.');
+  t.mock.timers.tick(1);
+  assert.equal(elements.get('#post-form-message').textContent, '');
 });
 
 test('unchecked publication explicitly sends false', async (t) => {
@@ -280,6 +398,7 @@ test('unchecked publication explicitly sends false', async (t) => {
 });
 
 test('moderation failures keep the draft and allow a corrected submission', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const { elements, requests, ui } = mount(t);
   requests[0].resolve([]);
   await settle();
@@ -298,6 +417,7 @@ test('moderation failures keep the draft and allow a corrected submission', asyn
     const draft = `Szkic po poprawce ${index}`;
     content.value = draft;
     content.dispatchEvent(new Event('input'));
+    assert.equal(message.textContent, '');
     form.dispatchEvent(new Event('submit', { cancelable: true }));
     assert.equal(message.textContent, 'Sprawdzanie treści...');
     const request = requests[index + 1];
@@ -313,10 +433,40 @@ test('moderation failures keep the draft and allow a corrected submission', asyn
     assert.equal(elements.get('#publish-post').disabled, false);
     assert.equal(message.textContent, body.message);
     assert.equal(message.dataset.kind, 'error');
+    t.mock.timers.tick(3000);
+    assert.equal(message.textContent, body.message);
   }
 
   ui.clear();
   assert.equal(content.value, '');
   assert.equal(anonymous.checked, false);
   assert.equal(message.textContent, '');
+});
+
+test('editing dismisses success immediately and its timer cannot clear the next error', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { elements, requests } = mount(t);
+  const content = elements.get('#post-content');
+  const form = elements.get('#post-form');
+  const message = elements.get('#post-form-message');
+  requests[0].resolve([]);
+  await settle();
+
+  content.value = 'Pierwszy wpis';
+  form.dispatchEvent(new Event('submit', { cancelable: true }));
+  requests[1].resolve(post(1, content.value), 201);
+  await settle();
+  requests[2].resolve([]);
+  await settle();
+  assert.equal(message.dataset.kind, 'success');
+
+  content.value = 'Kolejny szkic';
+  content.dispatchEvent(new Event('input'));
+  assert.equal(message.textContent, '');
+  form.dispatchEvent(new Event('submit', { cancelable: true }));
+  requests[3].resolve({ message: 'Moderacja jest chwilowo niedostępna.' }, 503);
+  await settle();
+  t.mock.timers.tick(3000);
+  assert.equal(message.textContent, 'Moderacja jest chwilowo niedostępna.');
+  assert.equal(content.value, 'Kolejny szkic');
 });

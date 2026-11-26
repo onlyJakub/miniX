@@ -1,39 +1,360 @@
 @import "tailwindcss";
 
 @layer base {
-  body { @apply min-h-screen bg-slate-950 text-slate-100 antialiased; }
-  main { @apply mx-auto max-w-2xl px-5 py-10 sm:py-16; }
-  h1 { @apply text-4xl font-bold tracking-tight; }
-  h2 { @apply text-xl font-semibold; }
-  a { @apply text-sky-300 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-300; }
-  label { @apply block text-sm font-medium; }
-  input { @apply mt-2 block w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2.5 text-base focus:border-sky-400 focus:outline-2 focus:outline-sky-400; }
-  textarea { @apply mt-3 block w-full resize-y rounded-lg border border-slate-600 bg-slate-950 px-3 py-3 text-base focus:border-sky-400 focus:outline-2 focus:outline-sky-400; }
-  button { @apply cursor-pointer rounded-lg bg-sky-400 px-4 py-2.5 font-semibold text-slate-950 hover:bg-sky-300 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-300 disabled:cursor-wait disabled:opacity-60; }
+  :root {
+    color-scheme: dark;
+    --background: #080e19;
+    --surface: #101927;
+    --surface-raised: #162235;
+    --field: #0b1422;
+    --edge: #253449;
+    --control-edge: #40536d;
+    --text: #edf4ff;
+    --muted: #a0b2ca;
+    --accent: #8abfff;
+    --accent-hover: #b1d5ff;
+    --focus: #a7d0ff;
+  }
+
+  body {
+    @apply min-h-screen antialiased;
+    color: var(--text);
+    background: radial-gradient(ellipse at 40% 0, #142039 0, transparent 38rem), var(--background);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  h1 { @apply font-bold tracking-tight; }
+  h2 { @apply text-lg font-semibold tracking-tight sm:text-xl; }
+  a { @apply underline-offset-4 hover:underline; color: var(--accent); }
+  label { @apply block text-sm font-semibold; }
+
+  :is(a, button, input, textarea):focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 3px;
+  }
+
+  :is(input:not([type="checkbox"]), textarea) {
+    @apply block w-full rounded-xl border px-3.5 py-3 text-base;
+    color: var(--text);
+    background: var(--field);
+    border-color: var(--control-edge);
+  }
+
+  :is(input:not([type="checkbox"]), textarea):focus { border-color: var(--accent); }
+  textarea { @apply resize-none leading-relaxed; }
+  textarea::placeholder { color: var(--muted); }
+
+  button {
+    @apply min-h-11 cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold;
+    color: var(--background);
+    background: var(--accent);
+  }
+
+  button:enabled:hover { background: var(--accent-hover); }
+  button:disabled { @apply cursor-not-allowed opacity-50; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    :is(button, .button-link, input, textarea) {
+      transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+    }
+  }
 }
 
 @layer components {
-  .session-screen { @apply flex min-h-[65vh] flex-col items-start justify-center; }
-  .welcome-layout { @apply max-w-6xl; }
-  .welcome-grid { @apply grid min-h-[75vh] items-center gap-12 py-8 md:grid-cols-2 md:gap-16; }
-  .welcome-mark { @apply text-[clamp(5rem,13vw,10rem)] leading-none font-bold tracking-tighter; }
-  .button-link { @apply inline-flex min-h-12 items-center justify-center rounded-full border border-transparent bg-sky-400 px-6 py-3 font-semibold text-slate-950 no-underline transition-colors hover:bg-sky-300 hover:no-underline; }
-  .panel { @apply mt-8 rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-8; }
-  .message { @apply mt-4 break-words text-sm leading-relaxed; }
+  .brand {
+    @apply inline-flex w-fit items-center gap-2.5 rounded-lg text-xl font-bold tracking-tight no-underline hover:no-underline;
+    color: var(--text);
+  }
+
+  .brand-icon {
+    @apply grid size-8 place-items-center rounded-lg text-lg leading-none font-bold;
+    color: var(--background);
+    background: linear-gradient(145deg, #b0d4ff, #639ff0);
+  }
+
+  .brand-accent { color: var(--accent); }
+  .session-screen { @apply mx-auto grid min-h-svh w-full max-w-sm content-center justify-items-center px-4 text-center; }
+
+  .button-link {
+    @apply inline-flex min-h-12 items-center justify-center rounded-lg px-5 py-3 text-sm font-semibold no-underline hover:no-underline;
+    color: var(--background);
+    background: var(--accent);
+  }
+
+  .button-link:hover { background: var(--accent-hover); }
+  .button-secondary {
+    @apply border;
+    color: var(--text);
+    background: var(--surface-raised);
+    border-color: var(--edge);
+  }
+
+  :is(button, a).button-secondary:where(:not(:disabled)):hover {
+    color: var(--text);
+    background: #21314a;
+    border-color: #516a88;
+  }
+
+  .message { @apply mt-3 text-sm leading-relaxed wrap-break-word; color: var(--muted); }
+  .message:empty { @apply m-0; }
   .message[data-kind="error"] { @apply text-rose-300; }
   .message[data-kind="success"] { @apply text-emerald-300; }
-  .hint { @apply mt-2 text-sm leading-relaxed text-slate-400; }
-  .button-secondary { @apply border border-slate-600 bg-transparent font-medium text-slate-200 hover:border-sky-400 hover:bg-slate-800; }
-  .post-card { @apply rounded-2xl border border-slate-700 bg-slate-900 p-5 transition-colors hover:border-slate-500 sm:p-6; }
-  .post-text { @apply mt-3 whitespace-pre-wrap leading-relaxed [overflow-wrap:anywhere]; }
-  .anonymous-checkbox { @apply m-0 h-5 w-5 shrink-0 accent-sky-400; }
-  .like-button { @apply inline-flex min-h-11 items-center gap-2 rounded-full bg-transparent px-3 text-sm text-slate-400 transition-colors hover:bg-rose-500/10 hover:text-rose-400; }
-  .like-button[aria-pressed="true"] { @apply text-rose-400; }
-  .like-button svg { @apply h-5 w-5 fill-none stroke-current; stroke-width: 1.8; }
-  .like-button[aria-pressed="true"] svg { fill: currentColor; }
-  .feed-tabs { @apply mt-6 grid grid-cols-2 border-b border-slate-800; }
-  .feed-tab { @apply relative min-h-14 rounded-none bg-transparent px-2 text-sm font-semibold text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-slate-100 sm:text-base; }
-  .feed-tab[aria-selected="true"] { @apply text-slate-100; }
-  .feed-tab[aria-selected="true"]::after { content: ''; @apply absolute right-1/4 bottom-0 left-1/4 h-1 rounded-full bg-sky-400; }
+  .hint { @apply mt-2 text-sm leading-relaxed; color: var(--muted); }
+
+  .welcome-grid {
+    @apply mx-auto grid min-h-svh max-w-[74rem] content-center gap-8 px-4 py-6 sm:gap-12 sm:px-8 sm:py-12;
+  }
+
+  .welcome-art {
+    @apply flex min-h-[15rem] items-center justify-center rounded-3xl border p-8 sm:min-h-[20rem];
+    border-color: var(--edge);
+    background:
+      linear-gradient(100deg, rgb(6 14 28 / 74%), rgb(6 14 28 / 10%)),
+      url("/images/minix-hero.webp") center / cover,
+      #0c1830;
+  }
+
+  .welcome-mark { @apply text-[clamp(4rem,11vw,8rem)] leading-none font-bold tracking-[-0.075em]; }
+  .welcome-intro { @apply mx-auto w-full max-w-sm; }
+  .welcome-intro h1 { @apply text-[clamp(2.45rem,6.8vw,4.1rem)] leading-[1.05] tracking-[-0.045em]; }
+  .welcome-description { @apply mt-4 text-base leading-relaxed sm:mt-5 sm:text-lg; color: var(--muted); }
+  .welcome-actions { @apply mt-7 grid gap-3; }
+
+  @media (min-width: 48rem) {
+    .welcome-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: center; }
+    .welcome-art { min-height: clamp(27rem, 56vw, 38rem); }
+    .welcome-intro { margin-left: 0; }
+  }
+
+  .auth-content { @apply mx-auto grid min-h-svh w-full max-w-[32rem] content-center gap-5 px-4 py-8 sm:px-8 sm:py-12; }
+  .auth-content > .brand { @apply justify-self-center; }
+
+  .auth-card {
+    @apply rounded-2xl border p-5 sm:p-8;
+    background: var(--surface);
+    border-color: var(--edge);
+    box-shadow: 0 18px 60px rgb(0 0 0 / 18%);
+  }
+
+  .auth-card h1 { @apply text-3xl sm:text-4xl; }
+  .auth-form { @apply mt-6 grid gap-5; }
+  .auth-form input { @apply mt-2; }
+  .auth-form button { @apply mt-1 min-h-12 w-full; }
+
+  .auth-switch {
+    @apply mt-6 border-t pt-4 text-center text-sm leading-relaxed;
+    border-color: var(--edge);
+    color: var(--muted);
+  }
+
+  .auth-switch a { @apply font-semibold; }
+
+  body[data-page="feed"] {
+    --background: #0c1016;
+    --surface: #151b23;
+    --edge: #262e39;
+    --text: #e9edf4;
+    --muted: #8e99a7;
+    --accent: #8bbcff;
+    --accent-hover: #a9ceff;
+    --focus: var(--accent);
+    background: var(--background);
+  }
+
+  .feed-layout {
+    @apply mx-auto grid max-w-[83rem] items-start;
+  }
+
+  .feed-sidebar {
+    @apply flex min-w-0 items-center justify-between gap-3 border-b px-4 py-2;
+    border-color: var(--edge);
+  }
+
+  .sidebar-brand { @apply text-[1.75rem]; }
+  .sidebar-nav {
+    @apply fixed inset-x-0 bottom-0 z-10 grid grid-cols-2 gap-2 border-t px-3 pt-1;
+    padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+    background: var(--background);
+    border-color: var(--edge);
+  }
+
+  .sidebar-button {
+    @apply flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 px-2 py-1.5 text-sm leading-tight;
+    color: var(--muted);
+    background: transparent;
+  }
+
+  .sidebar-button:enabled:hover { color: var(--text); background: var(--surface); }
+  .sidebar-button[aria-current="true"] { color: var(--accent); background: var(--surface); }
+  .sidebar-button.new-post { color: var(--background); background: var(--accent); }
+  .sidebar-button.new-post:enabled:hover { color: var(--background); background: var(--accent-hover); }
+  .feed-layout svg { @apply size-5 shrink-0 fill-none stroke-current; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.65; }
+
+  .sidebar-account { @apply min-w-0; }
+  .account-row { @apply flex min-w-0 items-center gap-2; }
+  .account-identity { @apply min-w-0 flex-1; }
+  .account-name { @apply text-[0.9375rem] font-semibold [overflow-wrap:anywhere]; }
+  .account-email { @apply hidden truncate text-xs; color: var(--muted); }
+  .avatar {
+    @apply grid shrink-0 place-items-center rounded-full text-sm font-semibold;
+    width: var(--post-avatar-size, 2.5rem);
+    height: var(--post-avatar-size, 2.5rem);
+    color: #bed7ff;
+    background: #213146;
+  }
+  .account-row .avatar { @apply size-8 text-xs; }
+  .avatar-anonymous { color: var(--muted); background: var(--edge); }
+
+  .feed-column {
+    @apply min-h-svh min-w-0;
+    --feed-gutter: 1rem;
+    --post-avatar-size: 2.5rem;
+    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  }
+
+  .feed-header, .feed-tabs, .composer, .post-card, .preview-list li {
+    @apply border-b;
+    border-color: var(--edge);
+  }
+
+  .feed-header { @apply flex items-center justify-between gap-2 px-4 py-1 sm:px-5; }
+  .feed-header h1 { @apply text-xl font-semibold; }
+
+  .feed-icon-button {
+    @apply inline-grid size-11 shrink-0 place-items-center p-0;
+    color: var(--muted);
+    background: transparent;
+  }
+
+  .feed-icon-button:enabled:hover { color: var(--text); background: var(--surface); }
+
+  .feed-tabs { @apply grid grid-cols-2; }
+  .feed-tab {
+    @apply relative rounded-none px-2 text-[0.9375rem];
+    color: var(--muted);
+    background: transparent;
+  }
+
+  .feed-tab:enabled:hover { color: var(--text); background: var(--surface); }
+  .feed-tab[aria-selected="true"] { color: var(--text); }
+  .feed-tab[aria-selected="true"]::after {
+    content: "";
+    @apply absolute inset-x-0 bottom-0 mx-auto h-0.5 w-16 rounded-full;
+    background: var(--accent);
+  }
+  .feed-tab:focus-visible { outline-offset: -3px; }
+
+  .composer {
+    @apply grid grid-cols-[auto_minmax(0,1fr)] gap-3 pt-4 pb-3;
+    padding-inline: var(--feed-gutter);
+    scroll-margin-block-start: 0.75rem;
+  }
+  .composer textarea {
+    @apply box-border min-h-[5.5rem] max-w-full rounded-lg bg-transparent px-3 py-2.5 leading-relaxed;
+    border-color: var(--edge);
+  }
+  .composer textarea:focus {
+    border-color: var(--focus);
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+  }
+  .composer-footer { @apply mt-4 flex flex-wrap items-center justify-between gap-2; }
+  .composer-actions { @apply ml-auto flex items-center gap-2; }
+  .composer-actions button { @apply min-h-10; }
+  .anonymous-option { @apply inline-flex min-h-10 cursor-pointer items-center gap-2 text-sm font-normal; color: var(--muted); }
+  .anonymous-checkbox { @apply size-4 shrink-0 cursor-pointer; accent-color: var(--accent); }
+  .post-counter { @apply text-right text-sm tabular-nums; min-inline-size: 3ch; color: var(--muted); }
   #post-counter[data-kind="error"] { @apply text-red-400; }
+  .message.composer-message { @apply mt-1 min-h-6; }
+  .composer-message[data-kind="success"] { color: #83c7a1; }
+
+  .feed-list-heading { @apply px-4 pt-4 text-sm font-semibold sm:px-5; color: var(--muted); }
+  .feed-status:not(:empty) { @apply px-4 sm:px-5; }
+  .feed-pagination { @apply flex flex-wrap items-center justify-between gap-2 px-4 py-4 text-sm sm:px-5; color: var(--muted); }
+  .feed-pagination button { color: var(--text); background: var(--surface); }
+  .feed-pagination button:enabled:hover { background: var(--edge); }
+
+  .post-card {
+    @apply min-w-0 pt-4 pb-3;
+    padding-inline-start: calc(var(--feed-gutter) + var(--post-avatar-size) + 0.75rem);
+    padding-inline-end: var(--feed-gutter);
+  }
+  .post-meta { @apply relative flex flex-wrap items-baseline gap-x-2 gap-y-1; }
+  .post-meta .avatar { @apply absolute top-0; inset-inline-start: calc(0px - var(--post-avatar-size) - 0.75rem); }
+  .post-author { @apply min-w-0 text-[0.9375rem] font-semibold [overflow-wrap:anywhere]; }
+  .post-meta time { @apply text-[0.8125rem]; color: var(--muted); }
+  .post-text { @apply mt-1.5 text-base leading-6 whitespace-pre-wrap [overflow-wrap:anywhere]; }
+  .post-actions { @apply mt-0.5 flex items-center justify-between gap-2; }
+
+  .like-button {
+    @apply -ml-2 inline-flex min-h-11 items-center gap-1.5 px-2 text-xs font-medium tabular-nums;
+    color: var(--muted);
+    background: transparent;
+  }
+
+  .like-button:enabled:hover, .delete-button:enabled:hover { @apply bg-rose-400/10 text-rose-300; }
+  .like-button[aria-pressed="true"] { @apply text-rose-300; }
+  .like-button[aria-pressed="true"] svg { fill: currentColor; }
+
+  .trending-preview { @apply hidden; }
+  .preview-period { @apply mt-1 text-sm; color: var(--muted); }
+  .trending-preview .message:not(:empty) { @apply mt-4 border-t pt-3; border-color: var(--edge); }
+  .preview-list { @apply mt-2 list-decimal pl-5; }
+  .preview-list:empty { @apply mt-0; }
+  .preview-list li { @apply py-3.5; }
+  .preview-list li:last-child { @apply border-b-0 pb-0; }
+  .preview-list li::marker { color: var(--muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+  .preview-author { @apply text-[0.9375rem] font-semibold [overflow-wrap:anywhere]; }
+  .preview-text { @apply mt-1 line-clamp-2 text-sm leading-relaxed [overflow-wrap:anywhere]; }
+  .preview-likes { @apply mt-2 flex w-fit items-center gap-1.5 text-xs tabular-nums; color: var(--muted); }
+  .preview-likes svg { @apply size-3.5; }
+
+  @media (width < 40rem) {
+    html:has(body[data-page="feed"]) { scroll-padding-bottom: calc(4rem + env(safe-area-inset-bottom)); }
+  }
+
+  @media (min-width: 40rem) {
+    .feed-layout {
+      grid-template-columns: clamp(10.5rem, 20vw, 13rem) minmax(0, 43rem);
+      justify-content: center;
+      padding-inline: 0.75rem;
+    }
+
+    .feed-sidebar {
+      @apply sticky top-0 flex h-dvh flex-col items-stretch gap-4 overflow-y-auto border-0 px-3 py-4;
+    }
+    .sidebar-brand { @apply mx-2 mb-2; }
+    .sidebar-nav { @apply static flex flex-col gap-1 border-0 p-0; }
+    .sidebar-button { @apply min-h-11 flex-row justify-start gap-2.5 px-2 text-sm; }
+    .sidebar-button[aria-current="true"] { box-shadow: inset 2px 0 var(--accent); }
+    .sidebar-button.new-post { @apply mt-3 justify-center; }
+
+    .sidebar-account { @apply mt-auto border-t pt-3; border-color: var(--edge); }
+    .account-email { @apply block; }
+    .feed-column {
+      @apply border-x pb-0;
+      --feed-gutter: 1.25rem;
+      --post-avatar-size: 2.625rem;
+      border-color: var(--edge);
+    }
+  }
+
+  @media (min-width: 75rem) {
+    .feed-layout {
+      grid-template-columns: clamp(13rem, 17.75vw, 15rem) minmax(0, 1fr) clamp(17rem, 23.4vw, 19.5rem);
+      column-gap: 1rem;
+      padding-inline: 1rem;
+    }
+
+    .feed-sidebar { @apply px-4 py-5; }
+    .sidebar-button { @apply gap-3 px-3 text-base; }
+    .account-row { @apply gap-3; }
+    .account-row .avatar { @apply size-10 text-sm; }
+    .trending-preview {
+      @apply sticky top-4 mt-4 block min-w-0 rounded-xl border p-4;
+      border-color: var(--edge);
+      background: var(--surface);
+    }
+    .trending-preview h2 { @apply text-lg; }
+  }
 }

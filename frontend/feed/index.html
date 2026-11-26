@@ -9,59 +9,89 @@
   <body data-page="feed">
     <main>
       <section id="session-screen" class="session-screen" aria-label="Sprawdzanie sesji" aria-busy="true">
-        <p class="text-3xl font-bold">Mini<span class="text-sky-400">X</span></p>
+        <p class="brand"><span>Mini<span class="brand-accent">X</span></span></p>
         <p id="session-status" class="message" role="status" aria-live="polite">Sprawdzanie sesji…</p>
         <button id="retry-session" type="button" class="mt-5" hidden>Spróbuj ponownie</button>
       </section>
-      <div id="page-content" hidden>
-        <header class="flex flex-wrap items-start justify-between gap-5 border-b border-slate-800 pb-6">
-          <div>
-            <a href="/" class="no-underline hover:no-underline" aria-label="MiniX — strona główna"><h1>Mini<span class="text-sky-400">X</span></h1></a>
-            <p class="hint">Twój feed. Twoje myśli.</p>
-          </div>
-          <div class="min-w-0 text-sm">
-            <p class="wrap-break-words">Zalogowano jako <strong id="current-username"></strong></p>
-            <p id="current-email" class="hint wrap-break-words"></p>
-            <button id="logout" type="button" class="button-secondary mt-3 text-sm">Wyloguj się</button>
-            <p id="logout-message" class="message" role="alert"></p>
-          </div>
-        </header>
-        <div class="feed-tabs" role="tablist" aria-label="Widok feedu">
-          <button id="for-you-tab" class="feed-tab" type="button" role="tab" aria-selected="true" aria-controls="feed">Dla Ciebie</button>
-          <button id="trending-tab" class="feed-tab" type="button" role="tab" aria-selected="false" aria-controls="feed" tabindex="-1">Popularne 🔥</button>
-        </div>
-        <section id="post-composer" class="panel" aria-label="Publikowanie posta" hidden>
-          <form id="post-form">
-            <label for="post-content" class="text-xl">Co u Ciebie?</label>
-            <textarea id="post-content" name="content" class="resize-none" rows="3" required placeholder="Podziel się tym, co masz na myśli…" aria-describedby="post-counter-status post-hint"></textarea>
-            <p id="post-counter-status" class="mt-2 text-right text-sm text-slate-400" role="status" aria-atomic="true">
-              <span class="sr-only">Pozostało znaków</span>
-              <span id="post-counter">280</span>
-            </p>
-            <label for="post-anonymous" class="mt-4 flex items-center gap-3">
-              <input id="post-anonymous" name="is_anonymous" type="checkbox" class="anonymous-checkbox" aria-describedby="anonymous-hint" />
-              <span>Opublikuj anonimowo</span>
-            </label>
-            <div class="mt-4 flex justify-end">
-              <button id="publish-post" type="submit" class="disabled:cursor-not-allowed" disabled>Opublikuj</button>
-            </div>
-            <p id="post-form-message" class="message" role="status" aria-atomic="true"></p>
-          </form>
-        </section>
-        <p id="post-action-message" class="message" role="status" aria-live="polite" aria-atomic="true"></p>
-        <section id="feed" class="mt-8" role="tabpanel" aria-labelledby="for-you-tab">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <h2 id="feed-heading">Najnowsze wpisy</h2>
-            <button id="refresh-posts" type="button" class="button-secondary text-sm">Odśwież feed</button>
-          </div>
-          <p id="feed-message" class="message" role="status" aria-live="polite" aria-atomic="true">Ładowanie postów…</p>
-          <div id="post-list" class="mt-4 space-y-4" aria-busy="true"></div>
-          <nav id="feed-pagination" class="mt-6 flex flex-wrap items-center justify-between gap-3" aria-label="Strony feedu">
-            <button id="previous-page" type="button" class="button-secondary text-sm" disabled>Poprzednia</button>
-            <span id="page-label" class="text-sm text-slate-400" aria-live="polite">Strona 1</span>
-            <button id="next-page" type="button" class="button-secondary text-sm" disabled>Następna</button>
+      <div id="page-content" class="feed-layout" hidden>
+        <aside class="feed-sidebar">
+          <a href="/" class="brand sidebar-brand" aria-label="MiniX — strona główna"><span>Mini<span class="brand-accent">X</span></span></a>
+          <nav class="sidebar-nav" aria-label="Główna nawigacja">
+            <button id="nav-home" class="sidebar-button" type="button" aria-current="true">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+              <span>Strona główna</span>
+            </button>
+            <button id="new-post" class="sidebar-button new-post" type="button" aria-controls="post-composer">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              <span>Nowy post</span>
+            </button>
           </nav>
-        </section>
+          <div class="sidebar-account" aria-label="Twoje konto" role="group">
+            <div class="account-row">
+              <span id="account-avatar" class="avatar" aria-hidden="true"></span>
+              <div class="account-identity">
+                <p id="current-username" class="account-name"></p>
+                <p id="current-email" class="account-email"></p>
+              </div>
+              <button id="logout" class="feed-icon-button" type="button" aria-label="Wyloguj się" title="Wyloguj się">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5m4-12 4 4-4 4m-5-4h9"/></svg>
+              </button>
+            </div>
+            <p id="logout-message" class="message" data-kind="error" role="alert"></p>
+          </div>
+        </aside>
+
+        <div class="feed-column">
+          <header class="feed-header">
+            <h1 id="feed-title">Strona główna</h1>
+            <button id="refresh-posts" class="feed-icon-button" type="button" aria-label="Odśwież feed" title="Odśwież feed">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5m5 0a8 8 0 1 0-2 5.3"/></svg>
+            </button>
+          </header>
+          <div class="feed-tabs" role="tablist" aria-label="Widok feedu">
+            <button id="for-you-tab" class="feed-tab" type="button" role="tab" aria-selected="true" aria-controls="feed">Dla Ciebie</button>
+            <button id="trending-tab" class="feed-tab" type="button" role="tab" aria-selected="false" aria-controls="feed" tabindex="-1">Popularne</button>
+          </div>
+          <section id="feed" role="tabpanel" aria-labelledby="for-you-tab">
+            <section id="post-composer" class="composer" aria-label="Publikowanie posta" hidden>
+              <span id="composer-avatar" class="avatar" aria-hidden="true"></span>
+              <form id="post-form" novalidate>
+                <label for="post-content" class="sr-only">Treść posta</label>
+                <textarea id="post-content" name="content" rows="2" required placeholder="Co masz na myśli?" aria-describedby="post-counter-status"></textarea>
+                <div class="composer-footer">
+                  <label for="post-anonymous" class="anonymous-option">
+                    <input id="post-anonymous" name="is_anonymous" type="checkbox" class="anonymous-checkbox" />
+                    <span>Opublikuj anonimowo</span>
+                  </label>
+                  <div class="composer-actions">
+                    <p id="post-counter-status" class="post-counter" role="status" aria-atomic="true">
+                      <span class="sr-only">Pozostało znaków</span>
+                      <span id="post-counter">280</span>
+                    </p>
+                    <button id="publish-post" type="submit" disabled>Opublikuj</button>
+                  </div>
+                </div>
+                <p id="post-form-message" class="message composer-message" role="status" aria-atomic="true"></p>
+              </form>
+            </section>
+            <p id="post-action-message" class="message feed-status" role="status" aria-atomic="true"></p>
+            <h2 id="feed-heading" class="feed-list-heading" hidden>Gorące Posty · ostatnie 24 godziny</h2>
+            <p id="feed-message" class="message feed-status" role="status" aria-atomic="true">Ładowanie postów…</p>
+            <div id="post-list" aria-busy="true"></div>
+            <nav id="feed-pagination" class="feed-pagination" aria-label="Strony feedu">
+              <button id="previous-page" type="button" disabled>Poprzednia</button>
+              <span id="page-label" aria-live="polite">Strona 1</span>
+              <button id="next-page" type="button" disabled>Następna</button>
+            </nav>
+          </section>
+        </div>
+
+        <aside class="trending-preview" aria-labelledby="trending-preview-title">
+          <h2 id="trending-preview-title">Gorące Posty</h2>
+          <p class="preview-period">Ostatnie 24 godziny</p>
+          <p id="trending-preview-message" class="message" role="status"></p>
+          <ol id="trending-preview-list" class="preview-list"></ol>
+        </aside>
       </div>
     </main>
   </body>

@@ -7,37 +7,36 @@
     <script type="module" src="/src/main.js"></script>
   </head>
   <body data-page="register">
-    <main>
+    <main class="auth-page">
       <section id="session-screen" class="session-screen" aria-label="Sprawdzanie sesji" aria-busy="true">
-        <p class="text-3xl font-bold">Mini<span class="text-sky-400">X</span></p>
+        <p class="brand"><span class="brand-icon" aria-hidden="true">m</span><span>Mini<span class="brand-accent">X</span></span></p>
         <p id="session-status" class="message" role="status" aria-live="polite">Sprawdzanie sesji…</p>
         <button id="retry-session" type="button" class="mt-5" hidden>Spróbuj ponownie</button>
       </section>
-      <div id="page-content" hidden>
-      <a href="/">← MiniX</a>
-      <section class="panel" aria-labelledby="register-heading">
-        <h1 id="register-heading">Utwórz konto</h1>
-        <p class="hint">Wypełnij formularz, aby dołączyć do MiniX.</p>
-        <form id="auth-form" data-action="register" class="mt-6 space-y-5" method="post" action="/api/auth/register">
-          <div>
-            <label for="username">Nazwa użytkownika</label>
-            <input id="username" name="username" type="text" required minlength="3" maxlength="50" pattern="[A-Za-z0-9_]+" autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="username-hint" />
-            <p id="username-hint" class="hint">3–50 liter A–Z, cyfr lub znaków podkreślenia. Wielkość liter nie rozróżnia kont.</p>
-          </div>
-          <div>
-            <label for="email">Adres e-mail</label>
-            <input id="email" name="email" type="email" required maxlength="255" autocomplete="email" autocapitalize="none" spellcheck="false" />
-          </div>
-          <div>
-            <label for="password">Hasło</label>
-            <input id="password" name="password" type="password" required minlength="8" maxlength="128" autocomplete="new-password" aria-describedby="password-hint" />
-            <p id="password-hint" class="hint">Od 8 do 128 znaków.</p>
-          </div>
-          <button type="submit">Zarejestruj się</button>
-        </form>
-        <p id="form-message" class="message" role="alert" aria-live="polite"></p>
-        <p class="mt-6 text-sm">Masz już konto? <a href="/login">Zaloguj się</a></p>
-      </section>
+      <div id="page-content" class="auth-content" hidden>
+        <a href="/" class="brand" aria-label="MiniX — strona główna"><span class="brand-icon" aria-hidden="true">m</span><span>Mini<span class="brand-accent">X</span></span></a>
+        <section class="auth-card" aria-labelledby="register-heading">
+          <h1 id="register-heading" class="text-center">Utwórz konto</h1>
+          <form id="auth-form" data-action="register" class="auth-form" method="post" action="/api/auth/register">
+            <div>
+              <label for="username">Nazwa użytkownika</label>
+              <input id="username" name="username" type="text" required minlength="3" maxlength="50" pattern="[A-Za-z0-9_]+" autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="username-hint" />
+              <p id="username-hint" class="hint">3–50 liter A–Z, cyfr lub znaków podkreślenia. Wielkość liter nie rozróżnia kont.</p>
+            </div>
+            <div>
+              <label for="email">Adres e-mail</label>
+              <input id="email" name="email" type="email" required maxlength="255" autocomplete="email" autocapitalize="none" spellcheck="false" />
+            </div>
+            <div>
+              <label for="password">Hasło</label>
+              <input id="password" name="password" type="password" required minlength="8" maxlength="128" autocomplete="new-password" aria-describedby="password-hint" />
+              <p id="password-hint" class="hint">Od 8 do 128 znaków.</p>
+            </div>
+            <button type="submit">Zarejestruj się</button>
+          </form>
+          <p id="form-message" class="message" role="alert" aria-live="polite"></p>
+          <p class="auth-switch">Masz już konto? <a href="/login">Zaloguj się</a></p>
+        </section>
       </div>
     </main>
   </body>
