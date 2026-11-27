@@ -1,17 +1,11 @@
 import { apiRequest } from './api.js';
+import { canPublish, dateFormat, deleteIcon, remainingCharacters, showMessage, updateCharacterCounter } from './post-content.js';
+import { createReplyThread } from './replies.js';
 
 const PAGE_SIZE = 20;
-const POST_LIMIT = 280;
 const SUCCESS_MESSAGE_DURATION = 3000;
-const dateFormat = new Intl.DateTimeFormat('pl-PL', { dateStyle: 'medium', timeStyle: 'short' });
 const previewSegments = new Intl.Segmenter('pl', { granularity: 'grapheme' });
 const heartIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-9-5.5-9-12a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-9 12-9 12Z"/></svg>';
-const deleteIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16m-10 4v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
-
-function countPostCharacters(text) {
-  const trimmed = text.replace(/^[\p{White_Space}\u001c-\u001f]+|[\p{White_Space}\u001c-\u001f]+$/gu, '');
-  return [...trimmed].length;
-}
 
 function postAuthorName(post) {
   return post.is_anonymous ? 'Gall Anonim' : `@${post.author.username}`;
@@ -59,6 +53,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
   let currentUser = user;
   let activeTab = 'feed';
   let posts = [];
+  let postActionButtons = [];
   let offset = 0;
   let hasNext = false;
   let busy = false;
@@ -69,11 +64,6 @@ export function setupPosts({ user, onUnauthorized } = {}) {
   let successMessageTimer;
   const events = new AbortController();
 
-  function showMessage(element, text, kind = '') {
-    element.textContent = text;
-    element.dataset.kind = kind;
-  }
-
   function showFormMessage(text, kind = '') {
     clearTimeout(successMessageTimer);
     successMessageTimer = undefined;
@@ -83,17 +73,9 @@ export function setupPosts({ user, onUnauthorized } = {}) {
     }
   }
 
-  function updatePostCounter(length) {
-    const remaining = POST_LIMIT - length;
-    counter.textContent = String(remaining);
-    counter.dataset.kind = remaining < 20 ? 'error' : '';
-    content.setAttribute('aria-invalid', String(remaining < 0));
-  }
-
   function updateControls() {
-    const length = countPostCharacters(content.value);
-    updatePostCounter(length);
-    publishButton.disabled = busy || !currentUser || length === 0 || length > POST_LIMIT;
+    const remaining = updateCharacterCounter(content, counter);
+    publishButton.disabled = busy || !currentUser || !canPublish(remaining);
     content.disabled = busy;
     anonymous.disabled = busy;
     composerAvatar.textContent = anonymous.checked ? '?' : userInitial;
@@ -119,7 +101,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
     for (const button of [...tabs, homeNav]) button.disabled = mutationPending;
     newPost.disabled = mutationPending || (busy && !trending);
     list.setAttribute('aria-busy', String(busy));
-    for (const button of list.querySelectorAll('button')) button.disabled = busy;
+    for (const button of postActionButtons) button.disabled = busy;
   }
 
   function setBusy(value) {
@@ -136,6 +118,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
   function renderPosts() {
     const fragment = document.createDocumentFragment();
     const trending = activeTab === 'trending';
+    postActionButtons = [];
     for (const [index, post] of posts.entries()) {
       const article = document.createElement('article');
       article.className = 'post-card';
@@ -163,6 +146,8 @@ export function setupPosts({ user, onUnauthorized } = {}) {
 
       const actions = document.createElement('div');
       actions.className = 'post-actions';
+      const reactions = document.createElement('div');
+      reactions.className = 'post-reactions';
       const likeButton = document.createElement('button');
       likeButton.type = 'button';
       likeButton.className = 'like-button';
@@ -170,7 +155,10 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       likeButton.innerHTML = `${heartIcon}<span aria-hidden="true"></span>`;
       updateLikeButton(likeButton, post);
       likeButton.addEventListener('click', () => toggleLike(post, likeButton));
-      actions.append(likeButton);
+      const thread = createReplyThread(post, () => !disposed && article.isConnected, onUnauthorized);
+      reactions.append(likeButton, thread.button);
+      actions.append(reactions);
+      postActionButtons.push(likeButton, thread.button);
 
       if (post.is_owner) {
         const deleteButton = document.createElement('button');
@@ -182,8 +170,9 @@ export function setupPosts({ user, onUnauthorized } = {}) {
         deleteButton.disabled = busy;
         deleteButton.addEventListener('click', () => removePost(post.id, deleteButton));
         actions.append(deleteButton);
+        postActionButtons.push(deleteButton);
       }
-      article.append(actions);
+      article.append(actions, thread.panel);
       fragment.append(article);
     }
     list.replaceChildren(fragment);
@@ -236,6 +225,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
     if (trending) previewRequest += 1;
     setBusy(true);
     posts = [];
+    postActionButtons = [];
     list.replaceChildren();
     showMessage(feedMessage, trending ? 'Ładowanie rankingu…' : 'Ładowanie postów…');
     try {
@@ -325,8 +315,7 @@ export function setupPosts({ user, onUnauthorized } = {}) {
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const length = countPostCharacters(content.value);
-    if (disposed || busy || !currentUser || activeTab !== 'feed' || length === 0 || length > POST_LIMIT) return;
+    if (disposed || busy || !currentUser || activeTab !== 'feed' || !canPublish(remainingCharacters(content.value))) return;
     mutationPending = true;
     setBusy(true);
     showFormMessage('Sprawdzanie treści...', 'pending');
@@ -397,11 +386,12 @@ export function setupPosts({ user, onUnauthorized } = {}) {
       events.abort();
       currentUser = null;
       posts = [];
+      postActionButtons = [];
       content.value = '';
       anonymous.checked = false;
       accountAvatar.textContent = '';
       composerAvatar.textContent = '';
-      updatePostCounter(0);
+      updateCharacterCounter(content, counter);
       list.replaceChildren();
       previewList.replaceChildren();
       previewMessage.textContent = '';

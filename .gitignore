@@ -31,4 +31,5 @@ Thumbs.db
 migrations/
 
 demo_posts.txt
+demo_replies.txt
 seed_demo.py

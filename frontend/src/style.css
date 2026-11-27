@@ -264,7 +264,7 @@
   .anonymous-option { @apply inline-flex min-h-10 cursor-pointer items-center gap-2 text-sm font-normal; color: var(--muted); }
   .anonymous-checkbox { @apply size-4 shrink-0 cursor-pointer; accent-color: var(--accent); }
   .post-counter { @apply text-right text-sm tabular-nums; min-inline-size: 3ch; color: var(--muted); }
-  #post-counter[data-kind="error"] { @apply text-red-400; }
+  .post-counter [data-kind="error"] { @apply text-red-400; }
   .message.composer-message { @apply mt-1 min-h-6; }
   .composer-message[data-kind="success"] { color: #83c7a1; }
 
@@ -285,18 +285,40 @@
   .post-meta time { @apply text-[0.8125rem]; color: var(--muted); }
   .post-text { @apply mt-1.5 text-base leading-6 whitespace-pre-wrap [overflow-wrap:anywhere]; }
   .post-actions { @apply mt-0.5 flex items-center justify-between gap-2; }
+  .post-reactions { @apply flex items-center gap-1; }
 
-  .like-button {
-    @apply -ml-2 inline-flex min-h-11 items-center gap-1.5 px-2 text-xs font-medium tabular-nums;
+  .like-button, .reply-toggle {
+    @apply inline-flex min-h-11 items-center gap-1.5 px-2 text-xs font-medium tabular-nums;
     color: var(--muted);
     background: transparent;
   }
 
+  .like-button { @apply -ml-2; }
   .like-button:enabled:hover, .delete-button:enabled:hover { @apply bg-rose-400/10 text-rose-300; }
   .like-button[aria-pressed="true"] { @apply text-rose-300; }
   .like-button[aria-pressed="true"] svg { fill: currentColor; }
+  .reply-toggle:enabled:hover, .reply-toggle[aria-expanded="true"] {
+    color: var(--accent);
+    background: var(--surface);
+  }
+
+  .reply-thread { @apply mt-2 min-w-0 border-t pt-2; border-color: var(--edge); }
+  .reply-item { @apply flex items-start gap-2 border-b py-3; border-color: var(--edge); }
+  .reply-item .reply-avatar { @apply size-7 text-xs; }
+  .reply-body { @apply min-w-0 flex-1; }
+  .reply-meta { @apply flex flex-wrap items-baseline gap-x-2 text-sm [overflow-wrap:anywhere]; }
+  .reply-meta time { @apply text-xs; color: var(--muted); }
+  .reply-content { @apply mt-1 text-sm leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]; }
+  .reply-pages { @apply mt-1 flex justify-end; }
+  .reply-retry { @apply mt-2; }
+  .reply-form { @apply mt-2 grid gap-2; }
+  .reply-form textarea { @apply min-h-16 rounded-lg bg-transparent px-3 py-2; border-color: var(--edge); }
+  .reply-form textarea:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .reply-form .message { @apply mt-0; }
 
   .trending-preview { @apply hidden; }
+  .trending-heading { @apply flex items-center gap-2; }
+  .trending-heading svg { @apply size-4 text-amber-300; }
   .preview-period { @apply mt-1 text-sm; color: var(--muted); }
   .trending-preview .message:not(:empty) { @apply mt-4 border-t pt-3; border-color: var(--edge); }
   .preview-list { @apply mt-2 list-decimal pl-5; }
