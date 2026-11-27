@@ -32,4 +32,16 @@ CREATE INDEX posts_created_at_idx ON posts (created_at DESC, id DESC);
 CREATE INDEX posts_user_id_idx ON posts (user_id);
 CREATE INDEX likes_post_id_idx ON likes (post_id);
 
+CREATE TABLE replies (
+    id SERIAL PRIMARY KEY,
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content VARCHAR(280) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT replies_content_not_blank CHECK (content ~ '[^[:space:]]')
+);
+
+CREATE INDEX replies_post_created_idx ON replies (post_id, created_at, id);
+CREATE INDEX replies_user_id_idx ON replies (user_id);
+
 COMMIT;

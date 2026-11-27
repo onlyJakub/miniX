@@ -75,9 +75,32 @@
               </form>
             </section>
             <p id="post-action-message" class="message feed-status" role="status" aria-atomic="true"></p>
-            <h2 id="feed-heading" class="feed-list-heading" hidden>Gorące Posty · ostatnie 24 godziny</h2>
+            <h2 id="feed-heading" class="feed-list-heading trending-heading" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22c4 0 7-3 7-7 0-3-2-6-4-8 0 3-1 4-2 5 0-4-1-7-4-10 .5 4-1 6-3 9-1 1.5-2 3-2 5 0 3 3 6 8 6Z"/><path d="M12 22c-2 0-3-2-3-4 0-1.5 1-3 3-5 0 2 2 3 2 5s0 3-2 4Z"/></svg>
+              <span>Gorące Posty · ostatnie 24 godziny</span>
+            </h2>
             <p id="feed-message" class="message feed-status" role="status" aria-atomic="true">Ładowanie postów…</p>
             <div id="post-list" aria-busy="true"></div>
+            <template id="reply-thread-template">
+              <p class="message reply-list-message" role="status"></p>
+              <div class="reply-list"></div>
+              <nav class="reply-pages" aria-label="Strony odpowiedzi" hidden>
+                <button class="feed-icon-button reply-previous" type="button" aria-label="Poprzednie odpowiedzi">‹</button>
+                <button class="feed-icon-button reply-next" type="button" aria-label="Następne odpowiedzi">›</button>
+              </nav>
+              <button class="reply-retry" type="button" hidden>Ponów pobieranie</button>
+              <form class="reply-form" novalidate>
+                <textarea aria-label="Treść odpowiedzi" rows="2" placeholder="Napisz odpowiedź..." required></textarea>
+                <div class="composer-actions">
+                  <p class="post-counter" role="status" aria-atomic="true">
+                    <span class="sr-only">Pozostało znaków</span>
+                    <span class="reply-counter">280</span>
+                  </p>
+                  <button type="submit" disabled>Odpowiedz</button>
+                </div>
+                <p class="message" role="status" aria-atomic="true"></p>
+              </form>
+            </template>
             <nav id="feed-pagination" class="feed-pagination" aria-label="Strony feedu">
               <button id="previous-page" type="button" disabled>Poprzednia</button>
               <span id="page-label" aria-live="polite">Strona 1</span>
@@ -87,7 +110,10 @@
         </div>
 
         <aside class="trending-preview" aria-labelledby="trending-preview-title">
-          <h2 id="trending-preview-title">Gorące Posty</h2>
+          <h2 id="trending-preview-title" class="trending-heading">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22c4 0 7-3 7-7 0-3-2-6-4-8 0 3-1 4-2 5 0-4-1-7-4-10 .5 4-1 6-3 9-1 1.5-2 3-2 5 0 3 3 6 8 6Z"/><path d="M12 22c-2 0-3-2-3-4 0-1.5 1-3 3-5 0 2 2 3 2 5s0 3-2 4Z"/></svg>
+            <span>Gorące Posty</span>
+          </h2>
           <p class="preview-period">Ostatnie 24 godziny</p>
           <p id="trending-preview-message" class="message" role="status"></p>
           <ol id="trending-preview-list" class="preview-list"></ol>

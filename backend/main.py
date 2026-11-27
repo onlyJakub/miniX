@@ -51,6 +51,7 @@ async def validation_error(request: Request, error: RequestValidationError):
         "limit": "Limit musi być liczbą całkowitą od 1 do 50.",
         "offset": "Offset musi być nieujemną liczbą całkowitą mieszczącą się w zakresie bigint.",
         "post_id": "Identyfikator posta musi być dodatnią liczbą całkowitą z zakresu INTEGER.",
+        "reply_id": "Identyfikator odpowiedzi musi być dodatnią liczbą całkowitą z zakresu INTEGER.",
     }
     errors = []
     for item in error.errors():

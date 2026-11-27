@@ -37,6 +37,7 @@ class PostsTests(DatabaseTestCase):
                 "is_owner",
                 "likes_count",
                 "liked_by_me",
+                "replies_count",
             },
         )
         self.assertFalse(post["is_anonymous"])

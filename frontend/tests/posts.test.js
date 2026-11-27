@@ -201,22 +201,34 @@ test('anonymous cards hide author and use is_owner for deletion in both tabs', a
   const cards = elements.get('#post-list').children;
   assert.equal(cards[0].children[0].children[0].textContent, 'Gall Anonim');
   assert.equal(cards[1].children[0].children[0].textContent, 'Gall Anonim');
-  assert.equal(cards[0].querySelectorAll('button').length, 2);
-  assert.equal(cards[1].querySelectorAll('button').length, 1);
+  assert.equal(cards[0].querySelectorAll('button').length, 3);
+  assert.equal(cards[1].querySelectorAll('button').length, 2);
   assert.deepEqual(cards[0].dataset, { postId: '1' });
   elements.get('#trending-tab').click();
   requests[1].resolve([other]);
   await settle();
   const ranked = elements.get('#post-list').children[0];
   assert.equal(ranked.children[0].children[0].textContent, '1. Gall Anonim');
-  assert.equal(ranked.querySelectorAll('button').length, 1);
+  assert.equal(ranked.querySelectorAll('button').length, 2);
 });
 
 test('normal cards also use server ownership instead of comparing author ids', async (t) => {
   const { elements, requests } = mount(t);
   requests[0].resolve([{ ...post(1), is_owner: false }]);
   await settle();
-  assert.equal(elements.get('#post-list').children[0].querySelectorAll('button').length, 1);
+  assert.equal(elements.get('#post-list').children[0].querySelectorAll('button').length, 2);
+});
+
+test('collapsed replies show the server count without requesting the thread', async (t) => {
+  const { elements, requests } = mount(t);
+  requests[0].resolve([{ ...post(1), replies_count: 3 }]);
+  await settle();
+  const card = elements.get('#post-list').children[0];
+  const replyButton = card.querySelectorAll('button')[1];
+  assert.equal(replyButton.getAttribute('aria-label'), 'Odpowiedzi: 3');
+  assert.equal(replyButton.getAttribute('aria-expanded'), 'false');
+  assert.equal(card.children.at(-1).hidden, true);
+  assert.equal(requests.length, 1);
 });
 
 test('desktop preview preserves server order and ignores earlier responses after opening the ranking', async (t) => {
@@ -283,7 +295,7 @@ test('desktop preview refreshes after a like, deletion and publication', async (
   requests[1].resolve([post(1)]);
   await settle();
 
-  const [like, remove] = list.children[0].querySelectorAll('button');
+  const [like, , remove] = list.children[0].querySelectorAll('button');
   like.click();
   assert.equal(requests[2].url, '/api/posts/1/like');
   requests[2].resolve({ likes_count: 1, liked_by_me: true });
@@ -330,12 +342,14 @@ test('counter shows remaining Unicode code points and warns below twenty', async
     ['', 280, true],
     [' \t\n\u0085\u2003', 280, true],
     ['a'.repeat(200), 80, false],
+    ['a'.repeat(259), 21, false],
     ['ą'.repeat(260), 20, false],
     ['ą'.repeat(260) + '😀', 19, false],
     ['ą'.repeat(278) + '😀', 1, false],
     ['ą'.repeat(277) + '👩‍🔬', 0, false],
     ['ą'.repeat(278) + '👩‍🔬', -1, true],
     ['ą'.repeat(296), -16, true],
+    ['ą'.repeat(300), -20, true],
     ['\u0085' + 'ą'.repeat(279) + '😀\u2003', 0, false],
   ]) {
     content.value = value;
